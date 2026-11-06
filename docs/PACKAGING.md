@@ -1,4 +1,4 @@
-# 青简 0.2.0 打包说明 / Packaging notes
+# 青简 0.2.1 打包说明 / Packaging notes
 
 ## 默认发布：小 EXE + runtime
 
@@ -21,7 +21,7 @@ dist/Qingjian_ReadHistory/
   data/ logs/ webview-data/  首次启动生成
   使用說明.txt
   啟動青簡.bat / 備用啟動.bat / 診斷.bat
-dist/Qingjian_ReadHistory-0.2.0-win64.zip   约 235 MB
+dist/Qingjian_ReadHistory-0.2.1-win64.zip   约 235 MB
 ```
 
 编译启动器需要 WebView2 SDK（NuGet `Microsoft.Web.WebView2` 1.0.4314.35）：
@@ -82,7 +82,7 @@ $env:QINGJIAN_HOME = "D:\temp\qingjian-test"
 
 它会读取自身尾部页脚、展开载荷到 `$env:QINGJIAN_HOME\app`，打印路径后退出。`QINGJIAN_HOME` 也用于把安装根目录从 `%LOCALAPPDATA%\QingJian` 改到其他位置（调试或多用户测试）。
 
-EXE 的文件属性中包含产品名「青简 · ReadHistory」、版本 `0.2.0.0`、版权与 MIT 许可说明。
+EXE 的文件属性中包含产品名「青简 · ReadHistory」、版本 `0.2.1.0`、版权与 MIT 许可说明。
 
 ## 代碼簽名 / Code signing
 
