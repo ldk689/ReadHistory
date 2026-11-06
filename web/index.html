@@ -149,7 +149,7 @@
           <div class="status-right">
             <button id="focusBtn" class="status-btn">專注</button>
             <button id="themeBtn" class="status-btn">紙色</button>
-            <span class="app-version">v0.2.6</span>
+            <span class="app-version">v0.2.7</span>
             <span id="clock">--:--</span>
           </div>
         </footer>
@@ -301,13 +301,6 @@
               <button data-on="0">關</button>
             </div>
           </div>
-          <div class="setting-row">
-            <label>OCR 預設</label>
-            <div class="segmented" id="ocrDefaultSeg">
-              <button data-quality="fast" class="active">快速</button>
-              <button data-quality="high">精校</button>
-            </div>
-          </div>
           <div class="setting-inline setting-reset">
             <span>設定只保存在本機。</span>
             <button class="ghost" id="resetSettings">恢復預設</button>
@@ -316,20 +309,14 @@
 
         <section>
           <h4>OCR 與原影 <span class="section-tag">本地</span></h4>
-          <p class="setting-desc">掃描頁按導入時選定的版式識別：橫排走橫向行識別，豎排按直行切字後重排。快速模式約 3–8 秒/頁；精校模式較慢，但對古籍字頭更穩。</p>
+          <p class="setting-desc">掃描頁按導入時選定的版式識別：橫排走橫向行識別，豎排按直行切字後重排。自動流程會先快速預覽，再用精校模型寫入正文。</p>
           <div class="setting-row two">
             <label>頁碼範圍</label>
             <input id="ocrStart" type="number" min="1" value="49">
             <span class="dash">—</span>
             <input id="ocrEnd" type="number" min="1" value="52">
           </div>
-          <div class="setting-row">
-            <label>本次模式</label>
-            <div class="segmented" id="ocrQualitySeg">
-              <button data-quality="fast" class="active">快速</button>
-              <button data-quality="high">精校（慢）</button>
-            </div>
-          </div>
+          <p class="setting-desc">自動流程：先快速預覽前 20 頁，再用精校模型寫入正文；不需手動選模式。</p>
           <div class="ocr-progress" id="ocrProgress" hidden>
             <div class="ocr-progress-head"><span id="ocrProgressText">準備中…</span><b id="ocrProgressPct">0%</b></div>
             <div class="ocr-bar"><i id="ocrBar"></i></div>
@@ -414,12 +401,6 @@
               <input id="importStart" type="number" min="1" value="1">
               <span class="dash">—</span>
               <input id="importEnd" type="number" min="1" value="1">
-            </div>
-            <div class="setting-row"><label>識別</label>
-              <div class="segmented" id="importQualitySeg">
-                <button data-quality="fast" class="active">快速</button>
-                <button data-quality="high">精校（慢）</button>
-              </div>
             </div>
             <div class="setting-row"><label>前置頁</label>
               <div class="segmented" id="importSkipSeg">

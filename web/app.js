@@ -64,7 +64,6 @@
       meta: null,
       suggestion: null,
       layout: "auto",
-      quality: "fast",
       uploading: false,
       analyzing: false,
       forcedRetry: false,
@@ -183,8 +182,8 @@
       "noteQuote", "noteInput", "saveNote", "settingsModal", "themeSeg", "layoutSeg", "fontSeg",
       "fontRange", "fontRangeValue", "uiSizeSeg", "motionSeg", "lineHeightSeg",
       "paraGapSeg", "textWidthSeg", "columnGapSeg", "restoreSeg", "progressSeg",
-      "ocrDefaultSeg", "resetSettings",
-      "ocrStart", "ocrEnd", "ocrQualitySeg", "ocrProgress",
+      "resetSettings",
+      "ocrStart", "ocrEnd", "ocrProgress",
       "ocrProgressText", "ocrProgressPct", "ocrBar", "ocrState", "startOcr",
       "ocrTaskbar", "ocrTaskText", "ocrTaskPct", "ocrTaskBar", "ocrPauseBtn", "ocrStopBtn",
       "ocrModal", "ocrPageSelect", "ocrConfidence", "ocrText", "copyOcr", "saveOcr", "viewOcr",
@@ -195,7 +194,7 @@
       "importModal", "importDrop", "importFile", "importFileName", "importDropTitle",
       "importDetail", "importPreview", "importPreviewEmpty", "importBookTitle", "importAuthor",
       "importChapterTitle", "importLayoutSeg", "importRotation", "importDetectState", "importStart", "importEnd",
-      "importQualitySeg", "importSkipSeg", "importProgress", "importProgressText", "importProgressPct",
+      "importSkipSeg", "importProgress", "importProgressText", "importProgressPct",
       "importProgressBar", "importAnalyzeBtn", "importCommitBtn", "importHint",
     ];
     ids.forEach((id) => { el[id] = document.getElementById(id); });
@@ -1006,8 +1005,6 @@
     $$("#columnGapSeg button").forEach((b) => b.classList.toggle("active", b.dataset.colgap === state.columnGap));
     $$("#restoreSeg button").forEach((b) => b.classList.toggle("active", (b.dataset.on === "1") === state.restoreLast));
     $$("#progressSeg button").forEach((b) => b.classList.toggle("active", (b.dataset.on === "1") === state.autoSaveProgress));
-    $$("#ocrDefaultSeg button").forEach((b) => b.classList.toggle("active", b.dataset.quality === state.ocrDefault));
-    $$("#ocrQualitySeg button").forEach((b) => b.classList.toggle("active", b.dataset.quality === state.ocrDefault));
     if (state.book) {
       const total = state.book.total_pages || 1;
       const ch = state.chapters[0];
@@ -1187,11 +1184,10 @@
     const start = Number(el.ocrStart.value);
     const end = Number(el.ocrEnd.value);
     if (!start || !end || start < 1 || end < start) { toast("請填寫有效的頁碼範圍"); return; }
-    const quality = $("#ocrQualitySeg button.active")?.dataset.quality || "fast";
     try {
       const res = await api("/api/ocr/run", {
         method: "POST",
-        body: JSON.stringify({ book_id: state.bookId, start, end, quality }),
+        body: JSON.stringify({ book_id: state.bookId, start, end }),
       });
       el.ocrProgress.hidden = false;
       el.ocrBar.style.width = "0%";
@@ -1320,8 +1316,8 @@
   // ---------- import ----------
   function openImport() {
     state.importing = {
-      file: null, id: null, meta: null, suggestion: null,
-      layout: "auto", quality: state.ocrDefault, skipFrontMatter: true, uploading: false, analyzing: false,
+      file: null, id: null, meta: null, suggestion: null, outline: [],
+      layout: "auto", skipFrontMatter: true, uploading: false, analyzing: false,
     };
     el.importFile.value = "";
     el.importDetail.hidden = true;
@@ -1335,7 +1331,6 @@
     el.importCommitBtn.disabled = true;
     $$("#importLayoutSeg button").forEach((b) => b.classList.toggle("active", b.dataset.layout === "auto"));
     el.importRotation.value = "auto";
-    $$("#importQualitySeg button").forEach((b) => b.classList.toggle("active", b.dataset.quality === state.ocrDefault));
     $$("#importSkipSeg button").forEach((b) => b.classList.toggle("active", (b.dataset.skip === "1") === state.importing.skipFrontMatter));
     el.importModal.hidden = false;
   }
@@ -1428,6 +1423,7 @@
       };
       const res = await api("/api/import/analyze", { method: "POST", body: JSON.stringify(payload) });
       imp.suggestion = res.suggestion;
+      imp.outline = res.outline || [];
       const s = res.suggestion;
       const names = { vertical: "豎排", horizontal: "橫排" };
       const agree = imp.layout === "auto" || imp.layout === s.layout;
@@ -1436,15 +1432,19 @@
         + (s.page ? ` · 取樣第 ${s.page} 頁` : "")
         + (agree ? "" : `（你手動選擇了${names[imp.layout]}，將以手動為準）`)
         + (sample ? `<br><span class="detect-sample">試讀：${esc(sample.sample || "").slice(0, 48)}…</span>` : "")
+        + (imp.outline.length >= 2 ? `<br><span class="detect-sample">PDF 目錄：${imp.outline.length} 冊，導入時將按書籤自動分卷。</span>` : "")
         + (s.warning ? `<br><span class="detect-warning">${esc(s.warning)}</span>` : "");
       el.importProgress.hidden = true;
       el.importCommitBtn.disabled = false;
       const startNo = Number(el.importStart.value) || 1;
       const endNo = Number(el.importEnd.value) || startNo;
       const count = Math.max(1, endNo - startNo + 1);
-      el.importHint.textContent = count > 200
-        ? `將識別 ${count} 頁，可能需要數小時；建議先導入 10–20 頁試讀，確認版式與方向後再擴大範圍。`
-        : `將識別第 ${startNo}–${endNo} 頁。頁數多時需要較長時間，可在識別期間先離開此視窗。`;
+      const volumeHint = imp.outline.length >= 2
+        ? `將按 PDF 目錄分成 ${imp.outline.length} 卷；`
+        : "";
+      el.importHint.textContent = `${volumeHint}${count > 200
+        ? `共 ${count} 頁，先快速預覽再逐頁精校，可能需要數小時；建議先導入 10–20 頁確認。`
+        : `共 ${startNo}–${endNo} 頁，先快速預覽再精校。`}`;
     } catch (err) {
       el.importDetectState.textContent = "自動判斷失敗：" + err.message + "。請手動選擇豎排或橫排，再按「重新識別版式」。";
       el.importProgress.hidden = true;
@@ -1477,7 +1477,6 @@
     const rotation = el.importRotation.value !== "auto"
       ? Number(el.importRotation.value)
       : (imp.suggestion && imp.suggestion.layout === layout ? imp.suggestion.rotation : 0);
-    const quality = $("#importQualitySeg button.active")?.dataset.quality || "fast";
     el.importCommitBtn.disabled = true;
     el.importAnalyzeBtn.disabled = true;
     el.importProgress.hidden = false;
@@ -1492,7 +1491,7 @@
           title: el.importBookTitle.value.trim(),
           author: el.importAuthor.value.trim(),
           chapter_title: el.importChapterTitle.value.trim(),
-          layout, rotation, start, end, quality,
+          layout, rotation, start, end,
           skip_front_matter: state.importing.skipFrontMatter,
         }),
       });
@@ -1730,12 +1729,6 @@
       $$("#progressSeg button").forEach((x) => x.classList.toggle("active", x === b));
       saveReaderPrefs();
     }));
-    $$("#ocrDefaultSeg button").forEach((b) => b.addEventListener("click", () => {
-      state.ocrDefault = b.dataset.quality;
-      $$("#ocrDefaultSeg button").forEach((x) => x.classList.toggle("active", x === b));
-      $$("#ocrQualitySeg button").forEach((x) => x.classList.toggle("active", x.dataset.quality === state.ocrDefault));
-      saveReaderPrefs();
-    }));
     el.resetSettings.addEventListener("click", resetSettings);
     el.fontRange.addEventListener("input", () => applyFont(Number(el.fontRange.value), false));
     el.fontRange.addEventListener("change", () => saveReaderPrefs());
@@ -1749,12 +1742,6 @@
       try { await navigator.clipboard.writeText(el.ocrText.value); toast("已複製識別初稿"); }
       catch (_) { toast("複製失敗"); }
     });
-    $$("#ocrQualitySeg button").forEach((b) => b.addEventListener("click", () => {
-      $$("#ocrQualitySeg button").forEach((x) => x.classList.toggle("active", x === b));
-    }));
-    $$("#importQualitySeg button").forEach((b) => b.addEventListener("click", () => {
-      $$("#importQualitySeg button").forEach((x) => x.classList.toggle("active", x === b));
-    }));
     $$("#importSkipSeg button").forEach((b) => b.addEventListener("click", () => {
       state.importing.skipFrontMatter = b.dataset.skip === "1";
       $$("#importSkipSeg button").forEach((x) => x.classList.toggle("active", x === b));

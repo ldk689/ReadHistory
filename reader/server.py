@@ -455,6 +455,10 @@ class Handler(BaseHTTPRequestHandler):
         warning = ""
         if (best.get("chars") or 0) < 20:
             warning = "這幾頁文字太少，自動判斷可能不準；請換一個正文頁碼，或手動選擇豎排 / 橫排。"
+        try:
+            outline = ocr.pdf_outline(str(pdf))
+        except Exception:
+            outline = []
         return self.send_json(
             {
                 "suggestion": {
@@ -465,6 +469,7 @@ class Handler(BaseHTTPRequestHandler):
                     "pages": results,
                     "warning": warning,
                 },
+                "outline": outline,
                 "meta": meta,
             }
         )
@@ -487,10 +492,11 @@ class Handler(BaseHTTPRequestHandler):
         title = (payload.get("title") or meta.get("title") or "未命名史書").strip()[:80]
         author = (payload.get("author") or meta.get("author") or "").strip()[:80]
         chapter_title = (payload.get("chapter_title") or "全書").strip()[:60] or "全書"
-        quality = "high" if payload.get("quality") == "high" else "fast"
+        # 0.2.7 always previews in fast mode and then writes the final text
+        # with the high-quality model; there is no user-facing quality toggle.
+        quality = "high"
 
         book_id = "b-" + uuid.uuid4().hex[:10]
-        chapter_id = f"{book_id}-01"
         LIBRARY.mkdir(parents=True, exist_ok=True)
         dest_pdf = LIBRARY / f"{book_id}.pdf"
         shutil.copyfile(src, dest_pdf)
@@ -523,29 +529,75 @@ class Handler(BaseHTTPRequestHandler):
                 "status": "importing",
             }
         )
-        chapter = db.create_chapter(
-            {
-                "id": chapter_id,
-                "book_id": book_id,
-                "volume": "卷一",
-                "title": chapter_title,
-                "subtitle": "掃描本",
-                "order_no": 1,
-                "page_start": start,
-                "page_end": end,
-                "status": "importing",
-                "page_count": end - start + 1,
-            }
-        )
+        try:
+            outline = ocr.pdf_outline(str(dest_pdf))
+        except Exception:
+            outline = []
+
+        volume_specs: list[dict] = []
+        if len(outline) >= 2:
+            for index, item in enumerate(outline):
+                page_start = max(start, int(item.get("page") or start))
+                next_page = (
+                    int(outline[index + 1].get("page") or (end + 1))
+                    if index + 1 < len(outline)
+                    else end + 1
+                )
+                page_end = min(end, next_page - 1)
+                if page_start > page_end:
+                    continue
+                raw_title = ocr.cleaner_outline_title(item.get("title") or "")
+                match = re.search(r"第\s*0*(\d+)\s*[册冊]", raw_title)
+                volume = f"第{int(match.group(1)):02d}冊" if match else f"卷{index + 1}"
+                volume_specs.append(
+                    {
+                        "volume": volume,
+                        "title": raw_title or volume,
+                        "page_start": page_start,
+                        "page_end": page_end,
+                    }
+                )
+        if len(volume_specs) < 2:
+            volume_specs = [
+                {
+                    "volume": "卷一",
+                    "title": chapter_title,
+                    "page_start": start,
+                    "page_end": end,
+                }
+            ]
+
+        chapters = []
+        for index, spec in enumerate(volume_specs):
+            chapters.append(
+                db.create_chapter(
+                    {
+                        "id": f"{book_id}-{index + 1:02d}",
+                        "book_id": book_id,
+                        "volume": spec["volume"],
+                        "title": spec["title"],
+                        "subtitle": "掃描本",
+                        "order_no": index + 1,
+                        "page_start": spec["page_start"],
+                        "page_end": spec["page_end"],
+                        "status": "importing",
+                        "page_count": spec["page_end"] - spec["page_start"] + 1,
+                    }
+                )
+            )
+        chapter = chapters[0]
+        chapter_id = chapter["id"]
         job_id = f"ocr-{uuid.uuid4().hex[:8]}"
         job = {
             "id": job_id,
             "kind": "import",
             "book_id": book_id,
             "chapter_id": chapter_id,
+            "chapters": chapters,
             "start": start,
             "end": end,
             "quality": quality,
+            "preview": True,
             "layout": layout,
             "rotation": int(payload.get("rotation") or 0),
             "skip_front_matter": bool(payload.get("skip_front_matter", True)),
@@ -561,7 +613,10 @@ class Handler(BaseHTTPRequestHandler):
         }
         OCR_JOBS[job_id] = job
         threading.Thread(target=run_ocr_job, args=(job,), daemon=True).start()
-        return self.send_json({"book": book, "chapter": chapter, "job": job}, 202)
+        return self.send_json(
+            {"book": book, "chapter": chapter, "chapters": chapters, "job": job},
+            202,
+        )
 
     # ---------- ocr ----------
     def start_ocr(self, payload: dict):
@@ -571,14 +626,24 @@ class Handler(BaseHTTPRequestHandler):
         start = int(payload.get("start") or 1)
         end = int(payload.get("end") or start)
         end = max(start, min(end, start + 199, int(book.get("total_pages") or end)))
-        quality = "high" if payload.get("quality") == "high" else "fast"
+        quality = "high"
         chapter_id = None
+        job_chapters = []
         if book.get("imported"):
-            chapters = db.get_chapters(book["id"])
-            if chapters:
-                chapter_id = chapters[0]["id"]
-                start = max(start, int(chapters[0]["page_start"] or 1))
-                end = min(end, int(chapters[0]["page_end"] or end))
+            for chapter in db.get_chapters(book["id"]):
+                page_start = max(start, int(chapter.get("page_start") or 1))
+                page_end = min(end, int(chapter.get("page_end") or end))
+                if page_start <= page_end:
+                    job_chapters.append(
+                        {
+                            "id": chapter["id"],
+                            "page_start": page_start,
+                            "page_end": page_end,
+                            "volume": chapter.get("volume") or "",
+                        }
+                    )
+            if job_chapters:
+                chapter_id = job_chapters[0]["id"]
         job_id = f"ocr-{uuid.uuid4().hex[:8]}"
         rotation = book.get("orientation")
         job = {
@@ -586,9 +651,11 @@ class Handler(BaseHTTPRequestHandler):
             "kind": "import" if book.get("imported") else "ocr",
             "book_id": book["id"],
             "chapter_id": chapter_id,
+            "chapters": job_chapters,
             "start": start,
             "end": end,
             "quality": quality,
+            "preview": bool(book.get("imported")),
             "layout": book.get("layout") or "horizontal",
             "rotation": int(rotation) if rotation is not None else None,
             "skip_front_matter": True,
@@ -641,36 +708,94 @@ def run_ocr_job(job: dict):
         job["status"] = "error"
         job["message"] = "原始 PDF 不可用。請把 PDF 放入 data/inbox/，或設定 READHISTORY_PDF。"
         return
-    if job["quality"] == "high" and not high_ocr_available():
-        job["quality"] = "fast"
-        job["message"] = "精校模型未包含在此版本中，已改用快速模式"
-    lang = "ch_doc_server" if job["quality"] == "high" else "chinese_cht_mobile"
+    # The 90 MB ch_doc_server model is accurate but takes minutes per page on
+    # ordinary CPUs. Use the PP-OCRv4 mobile recogniser for the final text and
+    # keep the traditional mobile model for the 20-page quick preview.
+    lang = "ch_mobile" if job.get("quality") == "high" else "chinese_cht_mobile"
     layout = job.get("layout") or book.get("layout") or "horizontal"
     rotation = job.get("rotation")
     if rotation is None and book.get("orientation") is not None:
         rotation = int(book["orientation"])
-    chapter_id = job.get("chapter_id")
-    importing = job.get("kind") == "import" and chapter_id
+    chapter_ranges = []
+    if job.get("kind") == "import":
+        if job.get("chapters"):
+            chapter_ranges = job["chapters"]
+        elif job.get("chapter_id"):
+            chapter_ranges = [
+                {
+                    "id": job["chapter_id"],
+                    "page_start": job["start"],
+                    "page_end": job["end"],
+                }
+            ]
+    importing = bool(chapter_ranges)
+
+    def chapter_for(page_no: int):
+        for chapter in chapter_ranges:
+            if int(chapter.get("page_start") or 0) <= page_no <= int(chapter.get("page_end") or 0):
+                return chapter
+        return chapter_ranges[0] if chapter_ranges else None
+
+    def finish(status: str = "ready"):
+        for chapter in chapter_ranges:
+            db.update_chapter(chapter["id"], status=status)
+        db.update_book(job["book_id"], status=status)
+
+    def wait_or_cancel() -> bool:
+        while job.get("pause") and not job.get("cancel"):
+            if job.get("status") != "paused":
+                job["status"] = "paused"
+                job["message"] = "已暫停"
+            time.sleep(0.4)
+        if job.get("cancel"):
+            job["status"] = "cancelled"
+            job["message"] = "已停止"
+            if importing:
+                finish()
+            return False
+        if job.get("status") == "paused":
+            job["status"] = "running"
+            job["message"] = "繼續識別"
+        return True
+
     try:
         if importing:
-            db.delete_paragraphs_for_pages(chapter_id, job["start"], job["end"])
+            for chapter in chapter_ranges:
+                db.delete_paragraphs_for_pages(chapter["id"], job["start"], job["end"])
+        preview_done = False
+        if job.get("kind") == "import" and job.get("preview"):
+            preview_total = min(20, job["total"])
+            for offset, page_no in enumerate(
+                range(job["start"], job["start"] + preview_total)
+            ):
+                if not wait_or_cancel():
+                    return
+                job["current"] = page_no
+                job["message"] = f"快速預覽 {offset + 1}/{preview_total}"
+                job["percent"] = round((offset + 1) / max(1, preview_total) * 10)
+                try:
+                    ocr.analyze_page(
+                        src,
+                        page_no,
+                        book_id=job["book_id"],
+                        dpi=150,
+                        lang_rec="chinese_cht_mobile",
+                        layout=layout,
+                        rotation=int(rotation) if rotation is not None else None,
+                    )
+                except Exception:
+                    traceback.print_exc()
+            preview_done = True
+            job["percent"] = 10
+            job["message"] = "快速預覽完成，開始精校"
+        base_percent = 10 if preview_done else 0
         for n in range(job["start"], job["end"] + 1):
-            while job.get("pause") and not job.get("cancel"):
-                if job.get("status") != "paused":
-                    job["status"] = "paused"
-                    job["message"] = "已暫停"
-                time.sleep(0.4)
-            if job.get("cancel"):
-                job["status"] = "cancelled"
-                job["message"] = "已停止"
-                if importing:
-                    db.update_chapter(chapter_id, status="ready")
-                    db.update_book(job["book_id"], status="ready")
+            if not wait_or_cancel():
                 return
-            if job.get("status") == "paused":
-                job["status"] = "running"
-                job["message"] = "繼續識別"
             job["current"] = n
+            job["message"] = f"精校第 {n} 頁"
+            chapter = chapter_for(n)
+            chapter_id = chapter["id"] if chapter else None
             try:
                 result = ocr.analyze_page(
                     src,
@@ -688,6 +813,7 @@ def run_ocr_job(job: dict):
                 avg = result.get("average_confidence")
                 if (
                     importing
+                    and job.get("quality") != "high"
                     and rotation is not None
                     and avg is not None
                     and avg < 0.55
@@ -727,7 +853,7 @@ def run_ocr_job(job: dict):
                     if skip:
                         labels = {"cover": "封面", "copyright": "版權頁", "toc": "目錄"}
                         skipped_label = labels.get(page_kind, "前置頁")
-                    else:
+                    elif chapter_id:
                         for para in result.get("paragraphs", []):
                             text = (para.get("text") or "").strip()
                             if len(text) < 2:
@@ -750,31 +876,34 @@ def run_ocr_job(job: dict):
                 )
                 job["done"] += 1
                 job["processed"] = job.get("processed", 0) + 1
-                job["percent"] = round(job["processed"] / max(1, job["total"]) * 100)
+                job["percent"] = base_percent + round(
+                    job["processed"] / max(1, job["total"]) * (100 - base_percent)
+                )
+                chapter_label = f"{chapter.get('volume', '')}" if chapter else ""
                 job["message"] = (
                     f"第 {n} 頁：{skipped_label}，已略過"
                     if skipped_label
-                    else f"第 {n} 頁完成"
+                    else f"{chapter_label} 第 {n} 頁完成"
                 )
             except Exception as exc:
                 traceback.print_exc()
                 db.store_ocr_page(job["book_id"], n, "error", None, [])
                 job["processed"] = job.get("processed", 0) + 1
-                job["percent"] = round(job["processed"] / max(1, job["total"]) * 100)
+                job["percent"] = base_percent + round(
+                    job["processed"] / max(1, job["total"]) * (100 - base_percent)
+                )
                 job["message"] = f"第 {n} 頁失敗：{exc}"
         job["status"] = "done"
         job["percent"] = 100
         job["message"] = f"完成 {job['done']} 頁"
         if importing:
-            db.update_chapter(chapter_id, status="ready")
-            db.update_book(job["book_id"], status="ready")
+            finish()
     except Exception as exc:
         traceback.print_exc()
         job["status"] = "error"
         job["message"] = f"任务失败：{exc}"
         if importing:
-            db.update_chapter(chapter_id, status="ready")
-            db.update_book(job["book_id"], status="ready")
+            finish()
 
 
 def serve(host: str = "127.0.0.1", port: int = 8765):

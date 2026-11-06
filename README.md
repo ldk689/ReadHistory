@@ -2,7 +2,7 @@
 
 **青简（ReadHistory）** 是一款运行在 Windows 上的本地古籍阅读器。它把你手上的扫描版史书 PDF 做本地 OCR，重排成可检索、可批注的竖排 / 横排正文，不需要上传到任何服务器。
 
-当前版本 **0.2.6**，下载：[GitHub Releases](https://github.com/ldk689/ReadHistory/releases/latest)。
+当前版本 **0.2.7**，下载：[GitHub Releases](https://github.com/ldk689/ReadHistory/releases/latest)。
 
 ![青简阅读器](docs/screenshot-vertical.png)
 

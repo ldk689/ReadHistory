@@ -561,6 +561,44 @@ def _paragraphs_vertical(lines: list[dict[str, Any]], page_no: int, char_size: f
     return paragraphs
 
 
+def pdf_outline(pdf_path: str) -> list[dict[str, Any]]:
+    """Return top-level PDF bookmarks as 1-based page ranges.
+
+    Many scanned editions keep one bookmark per volume even when there is no
+    text layer. Those bookmarks are much more reliable than OCRing a faded
+    table of contents, so the importer uses them first.
+    """
+    import pypdfium2 as pdfium
+
+    pdf = pdfium.PdfDocument(pdf_path)
+    try:
+        items: list[dict[str, Any]] = []
+        seen: set[int] = set()
+        for bookmark in pdf.get_toc():
+            title = (bookmark.get_title() or "").strip()
+            if not title:
+                continue
+            try:
+                page = int(bookmark.get_dest().get_index()) + 1
+            except Exception:
+                continue
+            if page in seen:
+                continue
+            seen.add(page)
+            items.append({"title": title, "page": page, "level": int(bookmark.level or 0)})
+        items.sort(key=lambda item: item["page"])
+        return items
+    finally:
+        pdf.close()
+
+
+def cleaner_outline_title(title: str) -> str:
+    text = re.sub(r"\s+", " ", title or "").strip()
+    text = re.sub(r"^晉書[.．·\s]*", "", text)
+    text = re.sub(r"^晋书[.．·\s]*", "", text)
+    return text.strip(" .．·")
+
+
 def classify_page(text: str, line_count: int = 0) -> str:
     """Classify a page as cover / copyright / toc / body / other.
 
