@@ -109,6 +109,7 @@ CREATE TABLE IF NOT EXISTS ocr_pages (
     page_no INTEGER NOT NULL,
     status TEXT NOT NULL,
     confidence REAL,
+    kind TEXT,
     lines_json TEXT,
     updated_at TEXT,
     PRIMARY KEY (book_id, page_no)
@@ -133,6 +134,7 @@ def _migrate(con: sqlite3.Connection) -> None:
             ("created_at", "TEXT"),
         ],
         "chapters": [("page_count", "INTEGER DEFAULT 0")],
+        "ocr_pages": [("kind", "TEXT")],
     }
     for table, columns in wanted.items():
         have = {row["name"] for row in con.execute(f"PRAGMA table_info({table})")}
@@ -652,13 +654,18 @@ def set_setting(key: str, value: str) -> None:
 
 
 def store_ocr_page(
-    book_id: str, page_no: int, status: str, confidence: float | None, lines: list[dict[str, Any]]
+    book_id: str,
+    page_no: int,
+    status: str,
+    confidence: float | None,
+    lines: list[dict[str, Any]],
+    kind: str | None = None,
 ) -> None:
     with connect() as con:
         con.execute(
-            """INSERT OR REPLACE INTO ocr_pages (book_id,page_no,status,confidence,lines_json,updated_at)
-               VALUES (?,?,?,?,?,?)""",
-            (book_id, page_no, status, confidence, json.dumps(lines, ensure_ascii=False), now()),
+            """INSERT OR REPLACE INTO ocr_pages (book_id,page_no,status,confidence,kind,lines_json,updated_at)
+               VALUES (?,?,?,?,?,?,?)""",
+            (book_id, page_no, status, confidence, kind, json.dumps(lines, ensure_ascii=False), now()),
         )
         con.commit()
 
@@ -666,7 +673,7 @@ def store_ocr_page(
 def ocr_status(book_id: str) -> dict[str, Any]:
     with connect() as con:
         rows = con.execute(
-            "SELECT page_no,status,confidence,updated_at FROM ocr_pages WHERE book_id=? ORDER BY page_no",
+            "SELECT page_no,status,confidence,kind,updated_at FROM ocr_pages WHERE book_id=? ORDER BY page_no",
             (book_id,),
         ).fetchall()
         pages = rows_to_dicts(rows)

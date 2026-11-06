@@ -1,0 +1,20 @@
+AR PL UKai TW — modification notice
+=====================================
+
+Original font: AR PL UKai (ukai.ttc), Copyright (C) 1999 Arphic Technology
+Co., Ltd., distributed under the Arphic Public License (see `ARPHICPL.txt`).
+
+Source used:
+  Debian package `fonts-arphic-ukai` version 0.2.20080216.2-6
+  https://deb.debian.org/debian/pool/main/f/fonts-arphic-ukai/
+
+Modification:
+  On 2026-11-06, the Traditional Chinese face (index 2, "AR PL UKai TW")
+  was extracted from the TrueType Collection `ukai.ttc` into the standalone
+  TrueType file `web/fonts/AR-PL-UKai-TW.ttf` for use by the application's
+  web UI. Glyph outlines and metrics were not edited; only the container
+  format was changed by extracting that face.
+
+The original `.ttc` remains available from the Debian package and from
+Arphic's published source. This notice and the original license are kept
+with every copy of the font.

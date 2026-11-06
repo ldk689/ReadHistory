@@ -38,11 +38,11 @@ Windows 启动器是本项目原创代码，使用 .NET Framework 编译器编�
 |---|---|---|
 | Noto Serif SC | SIL OFL 1.1 | Yes, `web/fonts/NotoSerifSC-VF.ttf` |
 | Noto Sans SC | SIL OFL 1.1 | Yes, `web/fonts/NotoSansSC-VF.ttf` |
-| LXGW WenKai / 霞鹜文楷 | SIL OFL 1.1 | Yes, `web/fonts/LXGWWenKai-Regular.ttf` |
+| AR PL UKai TW | Arphic Public License | Yes, `web/fonts/AR-PL-UKai-TW.ttf` |
 | Times New Roman | Monotype proprietary | No; loaded from the local system if installed |
 | KaiTi / STKaiti / Kaiti SC | Microsoft / Apple proprietary | No; loaded from the local system if installed |
 
-See `LICENSES/OFL-1.1.txt`, `LICENSES/LXGW-WenKai-OFL.txt`, and `LICENSES/FONTS.md`. The bundled Noto and LXGW WenKai files are unmodified; the reserved font names are not used for modified versions.
+See `LICENSES/OFL-1.1.txt`, `LICENSES/ARPHICPL.txt`, `LICENSES/AR-PL-UKai-NOTICE.txt`, and `LICENSES/FONTS.md`. The Noto files are unmodified. The AR PL UKai TW file is face 2 extracted unmodified from the Debian `ukai.ttc`; the notice records the source and the container-format change.
 
 ## 样章文本 / Sample text
 

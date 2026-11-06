@@ -15,8 +15,8 @@
 }
 @font-face {
   font-family: "QingJian Kai";
-  src: local("LXGW WenKai"), local("霞鹜文楷"), local("霞鶩文楷"),
-       url("/fonts/LXGWWenKai-Regular.ttf") format("truetype"),
+  src: local("AR PL UKai TW"), local("AR PL KaitiM TW"),
+       url("/fonts/AR-PL-UKai-TW.ttf") format("truetype"),
        local("KaiTi"), local("STKaiti"), local("Kaiti SC");
   font-display: swap;
 }
@@ -38,7 +38,7 @@
   --shadow: 0 18px 50px rgba(51, 36, 14, .17);
   --font-song: "QingJian Song", "Noto Serif SC", "Source Han Serif SC", "Songti SC", "STSong", "SimSun", serif;
   --font-hei: "QingJian Hei", "Noto Sans SC", "Source Han Sans SC", "Microsoft YaHei", "PingFang SC", sans-serif;
-  --font-kai: "QingJian Kai", "LXGW WenKai", "KaiTi", "STKaiti", "Kaiti SC", "Noto Serif SC", serif;
+  --font-kai: "QingJian Kai", "AR PL UKai TW", "KaiTi", "STKaiti", "Kaiti SC", "Noto Serif SC", serif;
   --latin: "Times New Roman", "Tinos", "Liberation Serif", "Nimbus Roman";
   --serif: var(--latin), var(--font-song);
   --sans: var(--latin), var(--font-hei);

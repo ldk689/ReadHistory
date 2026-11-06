@@ -16,6 +16,14 @@
     ["金史", "元 · 脫脫等"], ["元史", "明 · 宋濂等"], ["明史", "清 · 張廷玉等"],
   ];
 
+  const PAGE_KIND_NAMES = {
+    cover: "封面",
+    copyright: "版權頁",
+    toc: "目錄",
+    body: "正文",
+    other: "其他",
+  };
+
   const state = {
     bookId: null,
     chapterId: null,
@@ -1019,7 +1027,7 @@
       return;
     }
     el.ocrPageSelect.innerHTML = pages
-      .map((p) => `<option value="${p.page_no}">第 ${p.page_no} 頁${p.status === "reviewed" ? " · 已校" : ""}</option>`)
+      .map((p) => `<option value="${p.page_no}">第 ${p.page_no} 頁${p.kind ? " · " + (PAGE_KIND_NAMES[p.kind] || p.kind) : ""}${p.status === "reviewed" ? " · 已校" : ""}</option>`)
       .join("");
     el.ocrModal.hidden = false;
     await loadOcrPage(pageNo || pages[0].page_no);
@@ -1030,7 +1038,8 @@
       const data = await api(`/api/ocr/pages/${state.bookId}/${pageNo}`);
       const lines = data.page.lines || [];
       el.ocrText.value = lines.map((l) => l.text || "").join("\n");
-      el.ocrConfidence.textContent = `${Math.round((data.page.confidence || 0) * 100)}% · ${lines.length} 行`;
+      const kindName = PAGE_KIND_NAMES[data.page.kind] || (data.page.kind ? data.page.kind : "未分類");
+      el.ocrConfidence.textContent = `${kindName} · ${Math.round((data.page.confidence || 0) * 100)}% · ${lines.length} 行`;
       el.ocrPageSelect.value = String(pageNo);
     } catch (err) {
       toast(err.message, 4000);

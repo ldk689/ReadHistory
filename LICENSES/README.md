@@ -3,7 +3,9 @@
 | 文件 | 适用组件 |
 |---|---|
 | `OFL-1.1.txt` | Noto Serif SC、Noto Sans SC 的通用 OFL 文本 |
-| `LXGW-WenKai-OFL.txt` | 霞鹜文楷（LXGW WenKai）的版权声明与 OFL 1.1 文本 |
+| `ARPHICPL.txt` | AR PL UKai 楷體的 Arphic Public License |
+| `AR-PL-UKai-NOTICE.txt` | AR PL UKai TW 字體擷取說明與來源 |
+| `AR-PL-UKai-copyright.txt` | AR PL UKai 的 Debian 版權資訊 |
 | `Apache-2.0.txt` | PDFium / pypdfium2、RapidOCR、OpenCV、Requests、FlatBuffers |
 | `BSD-3-Clause-NumPy.txt` | NumPy；PDFium 的 BSD-3-Clause 部分；Shapely / GEOS 的 BSD 部分 |
 | `HPND-Pillow.txt` | Pillow |

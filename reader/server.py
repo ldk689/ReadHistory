@@ -655,46 +655,40 @@ def run_ocr_job(job: dict):
                     and avg < 0.55
                 ):
                     try:
-                        probe = ocr.probe_page(src, n, forced_layout=layout)
-                        if (
-                            probe
-                            and probe.get("rotation") != int(rotation)
-                            and (probe.get("confidence") or 0) > avg + 0.05
-                        ):
+                        probe = ocr.probe_page(src, n)
+                        if probe and (
+                            probe.get("layout") != layout
+                            or probe.get("rotation") != int(rotation)
+                        ) and (probe.get("confidence") or 0) > avg + 0.05:
                             alt = ocr.analyze_page(
                                 src,
                                 n,
                                 book_id=job["book_id"],
                                 dpi=170,
                                 lang_rec=lang,
-                                layout=layout,
+                                layout=probe.get("layout") or layout,
                                 rotation=int(probe["rotation"]),
                             )
                             if (alt.get("average_confidence") or 0) > avg:
                                 result = alt
                     except Exception:
                         traceback.print_exc()
-                db.store_ocr_page(
-                    job["book_id"],
-                    n,
-                    "done",
-                    result.get("average_confidence"),
-                    result.get("lines", []),
-                )
+
                 skipped_label = ""
+                page_kind = None
                 if importing:
                     page_text = "".join(
                         (para.get("text") or "") for para in result.get("paragraphs", [])
                     )
-                    kind = ocr.classify_page(page_text, len(result.get("lines", [])))
-                    skip = job.get("skip_front_matter", True) and kind in {
+                    page_kind = ocr.classify_page(page_text, len(result.get("lines", [])))
+                    skip = job.get("skip_front_matter", True) and page_kind in {
                         "cover",
                         "copyright",
                         "toc",
                     }
                     if skip:
                         labels = {"cover": "封面", "copyright": "版權頁", "toc": "目錄"}
-                        skipped_label = labels.get(kind, "前置頁")
+                        skipped_label = labels.get(page_kind, "前置頁")
                     else:
                         for para in result.get("paragraphs", []):
                             text = (para.get("text") or "").strip()
@@ -708,6 +702,14 @@ def run_ocr_job(job: dict):
                                 page_end=n,
                                 confidence=para.get("confidence"),
                             )
+                db.store_ocr_page(
+                    job["book_id"],
+                    n,
+                    "done",
+                    result.get("average_confidence"),
+                    result.get("lines", []),
+                    kind=page_kind,
+                )
                 job["done"] += 1
                 job["message"] = (
                     f"第 {n} 頁：{skipped_label}，已略過"

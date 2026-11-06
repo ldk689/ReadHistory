@@ -2,7 +2,7 @@
 
 **青简（ReadHistory）** 是一款运行在 Windows 上的本地古籍阅读器。它把你手上的扫描版史书 PDF 做本地 OCR，重排成可检索、可批注的竖排 / 横排正文，不需要上传到任何服务器。
 
-当前版本 **0.2.2**，下载：[GitHub Releases](https://github.com/ldk689/ReadHistory/releases/latest)。
+当前版本 **0.2.5**，下载：[GitHub Releases](https://github.com/ldk689/ReadHistory/releases/latest)。
 
 ![青简阅读器](docs/screenshot-vertical.png)
 
@@ -23,7 +23,7 @@
 3. 识别完成后即可竖排 / 横排阅读；选中文字可批注，顶栏可打开原影、校勘、搜索与设置。
 4. 关闭窗口只是隐藏到托盘；右键托盘「青」图标 → **退出青简**。
 
-完整版包含精校 OCR；Lite 版体积更小，只保留快速 OCR。阅读窗口使用 Windows 自带的 WebView2，不依赖外部 Edge 标签页；Windows 10 若缺少 WebView2 Runtime，可安装 Microsoft Edge WebView2 Evergreen Runtime。
+阅读窗口使用 Windows 自带的 WebView2，不依赖外部 Edge 标签页；Windows 10 若缺少 WebView2 Runtime，可安装 Microsoft Edge WebView2 Evergreen Runtime。
 
 > 程序暂未做代码签名，首次运行可能触发 SmartScreen；确认来自本项目 Release 后，点「更多信息 → 仍要运行」。
 
@@ -33,7 +33,7 @@
 |---|---|---|---|
 | 宋体 | Noto Serif SC | SIL OFL 1.1 | 是 |
 | 黑体 | Noto Sans SC | SIL OFL 1.1 | 是 |
-| 楷体 | 霞鹜文楷（LXGW WenKai） | SIL OFL 1.1 | 是 |
+| 楷体 | AR PL UKai TW | Arphic Public License | 是 |
 | 西文 | Times New Roman | Monotype 商业字体 | 否，仅调用本机字体 |
 
 - 程序代码以 **MIT License** 开源。
