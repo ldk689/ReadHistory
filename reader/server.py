@@ -24,6 +24,17 @@ USER_ASSETS = paths.USER_ASSETS
 OCR_JOBS: dict[str, dict] = {}
 OCR_LOCK = threading.Lock()
 IMPORT_META = "meta.json"
+HIGH_OCR_MODEL = (
+    paths.APP_ROOT
+    / ".ocr2"
+    / "rapidocr"
+    / "models"
+    / "ch_doc_PP-OCRv4_rec_server_infer.onnx"
+)
+
+
+def high_ocr_available() -> bool:
+    return HIGH_OCR_MODEL.exists()
 
 
 def json_bytes(obj) -> bytes:
@@ -572,6 +583,9 @@ def run_ocr_job(job: dict):
         job["status"] = "error"
         job["message"] = "原始 PDF 不可用。請把 PDF 放入 data/inbox/，或設定 READHISTORY_PDF。"
         return
+    if job["quality"] == "high" and not high_ocr_available():
+        job["quality"] = "fast"
+        job["message"] = "精校模型未包含在此版本中，已改用快速模式"
     lang = "ch_doc_server" if job["quality"] == "high" else "chinese_cht_mobile"
     layout = job.get("layout") or book.get("layout") or "horizontal"
     rotation = job.get("rotation")

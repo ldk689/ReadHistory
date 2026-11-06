@@ -30,6 +30,15 @@
     theme: localStorage.getItem("qj-theme") || "paper",
     fontFamily: localStorage.getItem("qj-font-family") || "song",
     fontSize: Number(localStorage.getItem("qj-font") || 21),
+    uiSize: localStorage.getItem("qj-ui-size") || "medium",
+    reduceMotion: localStorage.getItem("qj-reduce-motion") === "1",
+    lineHeight: localStorage.getItem("qj-line-height") || "normal",
+    paraGap: localStorage.getItem("qj-para-gap") || "normal",
+    textWidth: localStorage.getItem("qj-text-width") || "normal",
+    columnGap: localStorage.getItem("qj-column-gap") || "normal",
+    restoreLast: localStorage.getItem("qj-restore-last") !== "0",
+    autoSaveProgress: localStorage.getItem("qj-autosave") !== "0",
+    ocrDefault: localStorage.getItem("qj-ocr-default") || "fast",
     notesOpen: false,
     originalOpen: false,
     activePid: null,
@@ -87,6 +96,9 @@
     applyLayout(state.layout, false);
     applyFont(state.fontSize, false);
     applyFontFamily(state.fontFamily, false);
+    applyUiSize(state.uiSize, false);
+    applyMotion(state.reduceMotion, false);
+    applyReaderStyle(false);
     tickClock();
     setInterval(tickClock, 30000);
 
@@ -99,11 +111,23 @@
       if (reader.layout) state.layout = reader.layout;
       if (reader.fontSize) state.fontSize = Number(reader.fontSize);
       if (reader.fontFamily) state.fontFamily = reader.fontFamily;
+      if (reader.uiSize) state.uiSize = reader.uiSize;
+      if (typeof reader.reduceMotion === "boolean") state.reduceMotion = reader.reduceMotion;
+      if (reader.lineHeight) state.lineHeight = reader.lineHeight;
+      if (reader.paraGap) state.paraGap = reader.paraGap;
+      if (reader.textWidth) state.textWidth = reader.textWidth;
+      if (reader.columnGap) state.columnGap = reader.columnGap;
+      if (typeof reader.restoreLast === "boolean") state.restoreLast = reader.restoreLast;
+      if (typeof reader.autoSaveProgress === "boolean") state.autoSaveProgress = reader.autoSaveProgress;
+      if (reader.ocrDefault) state.ocrDefault = reader.ocrDefault;
       if (typeof reader.notesOpen === "boolean") state.notesOpen = reader.notesOpen;
       applyTheme(state.theme);
       applyLayout(state.layout, false);
       applyFont(state.fontSize, false);
       applyFontFamily(state.fontFamily, false);
+      applyUiSize(state.uiSize, false);
+      applyMotion(state.reduceMotion, false);
+      applyReaderStyle(false);
 
       const params = new URLSearchParams(location.search);
       const hash = location.hash.match(/#\/read\/([\w-]+)(?:\/([\w-]+))?/);
@@ -146,7 +170,10 @@
       "notesPanel", "closeNotes", "notesBody", "notesIntro", "footnoteList", "statusText",
       "posText", "focusBtn", "themeBtn", "clock", "selectionMenu", "noteModal",
       "noteQuote", "noteInput", "saveNote", "settingsModal", "themeSeg", "layoutSeg", "fontSeg",
-      "fontRange", "fontRangeValue", "ocrStart", "ocrEnd", "ocrQualitySeg", "ocrProgress",
+      "fontRange", "fontRangeValue", "uiSizeSeg", "motionSeg", "lineHeightSeg",
+      "paraGapSeg", "textWidthSeg", "columnGapSeg", "restoreSeg", "progressSeg",
+      "ocrDefaultSeg", "resetSettings",
+      "ocrStart", "ocrEnd", "ocrQualitySeg", "ocrProgress",
       "ocrProgressText", "ocrProgressPct", "ocrBar", "ocrState", "startOcr",
       "ocrModal", "ocrPageSelect", "ocrConfidence", "ocrText", "copyOcr", "saveOcr", "viewOcr",
       "libraryModal", "libraryGrid", "importedGrid", "librarySummary", "libraryImportBtn",
@@ -185,7 +212,9 @@
     const wanted = chapterId && state.chapters.find((c) => c.id === chapterId);
     const libBook = state.library.find((b) => b.id === bookId);
     const progressId = libBook && libBook.progress && libBook.progress.chapter_id;
-    const progressChapter = state.chapters.find((c) => c.id === progressId && c.status === "ready");
+    const progressChapter = state.restoreLast
+      ? state.chapters.find((c) => c.id === progressId && c.status === "ready")
+      : null;
     const target = wanted || progressChapter || state.chapters.find((c) => c.status === "ready") || state.chapters[0];
     state.annotations = [];
     state.footnotes = [];
@@ -293,7 +322,7 @@
     state.paragraphs = data.paragraphs || [];
     state.footnotes = data.footnotes || [];
     state.annotations = data.annotations || [];
-    const restorePid = targetPid || (data.progress && data.progress.paragraph_id) || null;
+    const restorePid = targetPid || (state.restoreLast && data.progress && data.progress.paragraph_id) || null;
     state.activePid = restorePid || state.paragraphs[0]?.id || null;
 
     renderChapterHead();
@@ -564,7 +593,7 @@
   }
 
   async function saveProgress() {
-    if (!state.chapterId) return;
+    if (!state.chapterId || !state.autoSaveProgress) return;
     try {
       await api("/api/progress", {
         method: "POST",
@@ -796,6 +825,7 @@
     el.layoutBtn.classList.toggle("active", layout === "vertical");
     el.readerScroll.classList.toggle("vertical", layout === "vertical");
     $$("#layoutSeg button").forEach((b) => b.classList.toggle("active", b.dataset.layout === layout));
+    applyReaderStyle(false);
     if (state.chapter) {
       renderReader(state.activePid);
     }
@@ -846,6 +876,67 @@
     if (save) saveReaderPrefs();
   }
 
+  function applyUiSize(size, save = true) {
+    state.uiSize = ["small", "medium", "large"].includes(size) ? size : "medium";
+    document.body.dataset.uiSize = state.uiSize;
+    $$("#uiSizeSeg button").forEach((b) => b.classList.toggle("active", b.dataset.size === state.uiSize));
+    localStorage.setItem("qj-ui-size", state.uiSize);
+    if (save) saveReaderPrefs();
+  }
+
+  function applyMotion(reduce, save = true) {
+    state.reduceMotion = Boolean(reduce);
+    document.body.classList.toggle("reduce-motion", state.reduceMotion);
+    $$("#motionSeg button").forEach((b) => b.classList.toggle("active", (b.dataset.motion === "reduce") === state.reduceMotion));
+    localStorage.setItem("qj-reduce-motion", state.reduceMotion ? "1" : "0");
+    if (save) saveReaderPrefs();
+  }
+
+  function applyReaderStyle(render = true) {
+    const vertical = state.layout === "vertical";
+    const lineMap = vertical
+      ? { tight: 1.46, normal: 1.62, loose: 1.82 }
+      : { tight: 1.7, normal: 1.98, loose: 2.24 };
+    const gapMap = { tight: 0.62, normal: 1, loose: 1.45 };
+    const widthMap = { narrow: 680, normal: 820, wide: 980 };
+    const colMap = { tight: 1.2, normal: 1.9, loose: 2.65 };
+    el.readerText.style.setProperty("--reader-line-height", String(lineMap[state.lineHeight] || lineMap.normal));
+    el.readerText.style.setProperty("--para-gap", String(gapMap[state.paraGap] || gapMap.normal));
+    el.readerText.style.setProperty("--reader-width", (widthMap[state.textWidth] || widthMap.normal) + "px");
+    el.readerText.style.setProperty("--column-gap", (colMap[state.columnGap] || colMap.normal) + "em");
+    if (render && state.chapter) renderReader(state.activePid);
+  }
+
+  function resetSettings() {
+    if (!confirm("恢復所有介面與閱讀設定為預設值？批註與導入的書不會受影響。")) return;
+    state.theme = "paper";
+    state.layout = "vertical";
+    state.fontSize = 21;
+    state.fontFamily = "song";
+    state.uiSize = "medium";
+    state.reduceMotion = false;
+    state.lineHeight = "normal";
+    state.paraGap = "normal";
+    state.textWidth = "normal";
+    state.columnGap = "normal";
+    state.restoreLast = true;
+    state.autoSaveProgress = true;
+    state.ocrDefault = "fast";
+    state.notesOpen = false;
+    el.notesPanel.hidden = true;
+    el.notesBtn.classList.remove("active");
+    applyTheme(state.theme);
+    applyLayout(state.layout, false);
+    applyFont(state.fontSize, false);
+    applyFontFamily(state.fontFamily, false);
+    applyUiSize(state.uiSize, false);
+    applyMotion(state.reduceMotion, false);
+    applyReaderStyle();
+    saveReaderPrefs();
+    openSettings();
+    toast("已恢復預設設定");
+  }
+
   function saveReaderPrefs() {
     clearTimeout(saveReaderPrefs._t);
     saveReaderPrefs._t = setTimeout(() => {
@@ -854,6 +945,11 @@
         body: JSON.stringify({
           layout: state.layout, theme: state.theme, fontSize: state.fontSize,
           fontFamily: state.fontFamily, notesOpen: state.notesOpen,
+          uiSize: state.uiSize, reduceMotion: state.reduceMotion,
+          lineHeight: state.lineHeight, paraGap: state.paraGap,
+          textWidth: state.textWidth, columnGap: state.columnGap,
+          restoreLast: state.restoreLast, autoSaveProgress: state.autoSaveProgress,
+          ocrDefault: state.ocrDefault,
         }),
       }).catch(() => {});
     }, 400);
@@ -890,6 +986,16 @@
     $$("#layoutSeg button").forEach((b) => b.classList.toggle("active", b.dataset.layout === state.layout));
     $$("#fontSeg button").forEach((b) => b.classList.toggle("active", b.dataset.font === state.fontFamily));
     $$("#themeSeg button").forEach((b) => b.classList.toggle("active", b.dataset.theme === state.theme));
+    $$("#uiSizeSeg button").forEach((b) => b.classList.toggle("active", b.dataset.size === state.uiSize));
+    $$("#motionSeg button").forEach((b) => b.classList.toggle("active", (b.dataset.motion === "reduce") === state.reduceMotion));
+    $$("#lineHeightSeg button").forEach((b) => b.classList.toggle("active", b.dataset.line === state.lineHeight));
+    $$("#paraGapSeg button").forEach((b) => b.classList.toggle("active", b.dataset.gap === state.paraGap));
+    $$("#textWidthSeg button").forEach((b) => b.classList.toggle("active", b.dataset.width === state.textWidth));
+    $$("#columnGapSeg button").forEach((b) => b.classList.toggle("active", b.dataset.colgap === state.columnGap));
+    $$("#restoreSeg button").forEach((b) => b.classList.toggle("active", (b.dataset.on === "1") === state.restoreLast));
+    $$("#progressSeg button").forEach((b) => b.classList.toggle("active", (b.dataset.on === "1") === state.autoSaveProgress));
+    $$("#ocrDefaultSeg button").forEach((b) => b.classList.toggle("active", b.dataset.quality === state.ocrDefault));
+    $$("#ocrQualitySeg button").forEach((b) => b.classList.toggle("active", b.dataset.quality === state.ocrDefault));
     if (state.book) {
       const total = state.book.total_pages || 1;
       const ch = state.chapters[0];
@@ -1092,7 +1198,7 @@
   function openImport() {
     state.importing = {
       file: null, id: null, meta: null, suggestion: null,
-      layout: "auto", quality: "fast", uploading: false, analyzing: false,
+      layout: "auto", quality: state.ocrDefault, uploading: false, analyzing: false,
     };
     el.importFile.value = "";
     el.importDetail.hidden = true;
@@ -1106,7 +1212,7 @@
     el.importCommitBtn.disabled = true;
     $$("#importLayoutSeg button").forEach((b) => b.classList.toggle("active", b.dataset.layout === "auto"));
     el.importRotation.value = "auto";
-    $$("#importQualitySeg button").forEach((b) => b.classList.toggle("active", b.dataset.quality === "fast"));
+    $$("#importQualitySeg button").forEach((b) => b.classList.toggle("active", b.dataset.quality === state.ocrDefault));
     el.importModal.hidden = false;
   }
 
@@ -1448,8 +1554,45 @@
     $$("#layoutSeg button").forEach((b) => b.addEventListener("click", () => setLayout(b.dataset.layout)));
     $$("#fontSeg button").forEach((b) => b.addEventListener("click", () => {
       applyFontFamily(b.dataset.font);
-      toast(b.dataset.font === "kai" ? "已切換為楷體（優先使用本機霞鶩文楷/楷體）" : b.dataset.font === "hei" ? "已切換為黑體" : "已切換為宋體");
+      toast(b.dataset.font === "kai" ? "已切換為楷體（霞鶩文楷）" : b.dataset.font === "hei" ? "已切換為黑體" : "已切換為宋體");
     }));
+    $$("#uiSizeSeg button").forEach((b) => b.addEventListener("click", () => {
+      applyUiSize(b.dataset.size);
+      toast(b.dataset.size === "large" ? "介面字號已放大" : b.dataset.size === "small" ? "介面字號已縮小" : "介面字號已恢復標準");
+    }));
+    $$("#motionSeg button").forEach((b) => b.addEventListener("click", () => {
+      applyMotion(b.dataset.motion === "reduce");
+      toast(state.reduceMotion ? "已減少介面動效" : "已恢復標準動效");
+    }));
+    const bindReaderStyle = (selector, key, apply) => {
+      $$(selector + " button").forEach((b) => b.addEventListener("click", () => {
+        state[key] = b.dataset[key === "lineHeight" ? "line" : key === "paraGap" ? "gap" : key === "textWidth" ? "width" : "colgap"];
+        $$(selector + " button").forEach((x) => x.classList.toggle("active", x === b));
+        applyReaderStyle();
+        saveReaderPrefs();
+      }));
+    };
+    bindReaderStyle("#lineHeightSeg", "lineHeight");
+    bindReaderStyle("#paraGapSeg", "paraGap");
+    bindReaderStyle("#textWidthSeg", "textWidth");
+    bindReaderStyle("#columnGapSeg", "columnGap");
+    $$("#restoreSeg button").forEach((b) => b.addEventListener("click", () => {
+      state.restoreLast = b.dataset.on === "1";
+      $$("#restoreSeg button").forEach((x) => x.classList.toggle("active", x === b));
+      saveReaderPrefs();
+    }));
+    $$("#progressSeg button").forEach((b) => b.addEventListener("click", () => {
+      state.autoSaveProgress = b.dataset.on === "1";
+      $$("#progressSeg button").forEach((x) => x.classList.toggle("active", x === b));
+      saveReaderPrefs();
+    }));
+    $$("#ocrDefaultSeg button").forEach((b) => b.addEventListener("click", () => {
+      state.ocrDefault = b.dataset.quality;
+      $$("#ocrDefaultSeg button").forEach((x) => x.classList.toggle("active", x === b));
+      $$("#ocrQualitySeg button").forEach((x) => x.classList.toggle("active", x.dataset.quality === state.ocrDefault));
+      saveReaderPrefs();
+    }));
+    el.resetSettings.addEventListener("click", resetSettings);
     el.fontRange.addEventListener("input", () => applyFont(Number(el.fontRange.value), false));
     el.fontRange.addEventListener("change", () => saveReaderPrefs());
     el.startOcr.addEventListener("click", startOcr);

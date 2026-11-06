@@ -2,7 +2,7 @@
 
 **青简（ReadHistory）** 是一款运行在 Windows 上的本地古籍阅读器。它把你手上的扫描版史书 PDF 做本地 OCR，重排成可检索、可批注的竖排 / 横排正文，不需要上传到任何服务器。
 
-当前版本 **0.2.0**，下载：[GitHub Releases](https://github.com/ldk689/ReadHistory/releases/tag/v0.2.0)。
+当前版本 **0.2.1**，下载：[GitHub Releases](https://github.com/ldk689/ReadHistory/releases/latest)。
 
 ![青简阅读器](docs/screenshot-vertical.png)
 
@@ -13,11 +13,12 @@
 - **仿古籍界面**：纸纹底、朱砂印、双线边框；宋体、黑体、楷体三选一。
 - **原影对照**：随时打开对应扫描页，支持全屏放大，便于逐字校对。
 - **批注与检索**：选中文字可高亮、划线、写批注、复制；支持全文检索、阅读进度与校勘记。
+- **可调界面与阅读**：界面字号、减少动效、行距、段距、正文宽度、竖排列距，以及是否记住上次阅读、自动保存进度。
 - **本地优先**：PDF、OCR 文本、批注、进度都留在本机；没有账号、没有统计上传，也不连接翻译服务。
 
 ## 使用方法
 
-1. 从 [Releases](https://github.com/ldk689/ReadHistory/releases/tag/v0.2.0) 下载 ZIP，**完整解压**后双击 `Qingjian_ReadHistory.exe`。ZIP 属性若有「解除封鎖」，请先勾选再解压。
+1. 从 [Releases](https://github.com/ldk689/ReadHistory/releases/latest) 下载 ZIP，**完整解压**后双击 `Qingjian_ReadHistory.exe`。ZIP 属性若有「解除封鎖」，请先勾选再解压。
 2. 点左下角 **「导入 PDF」**，选择扫描本，确认版式、页码范围，开始后台 OCR。
 3. 识别完成后即可竖排 / 横排阅读；选中文字可批注，顶栏可打开原影、校勘、搜索与设置。
 4. 关闭窗口只是隐藏到托盘；右键托盘「青」图标 → **退出青简**。

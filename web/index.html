@@ -149,7 +149,7 @@
           <div class="status-right">
             <button id="focusBtn" class="status-btn">專注</button>
             <button id="themeBtn" class="status-btn">紙色</button>
-            <span class="app-version">v0.2.0</span>
+            <span class="app-version">v0.2.1</span>
             <span id="clock">--:--</span>
           </div>
         </footer>
@@ -185,12 +185,12 @@
   <div class="modal-backdrop" id="settingsModal" hidden>
     <div class="modal settings-modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
       <div class="modal-head">
-        <div><span class="panel-eyebrow">偏好</span><h3 id="settingsTitle">閱讀與識別</h3></div>
+        <div><span class="panel-eyebrow">偏好</span><h3 id="settingsTitle">閱讀與介面</h3></div>
         <button class="round-btn" data-close="settingsModal">×</button>
       </div>
       <div class="settings-body">
         <section>
-          <h4>版式</h4>
+          <h4>介面</h4>
           <div class="setting-row">
             <label>主題</label>
             <div class="segmented" id="themeSeg">
@@ -200,7 +200,26 @@
             </div>
           </div>
           <div class="setting-row">
-            <label>正文</label>
+            <label>介面字號</label>
+            <div class="segmented" id="uiSizeSeg">
+              <button data-size="small">小</button>
+              <button data-size="medium" class="active">標準</button>
+              <button data-size="large">大</button>
+            </div>
+          </div>
+          <div class="setting-row">
+            <label>動效</label>
+            <div class="segmented" id="motionSeg">
+              <button data-motion="normal" class="active">標準</button>
+              <button data-motion="reduce">減少</button>
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <h4>閱讀</h4>
+          <div class="setting-row">
+            <label>版式</label>
             <div class="segmented" id="layoutSeg">
               <button data-layout="vertical" class="active">豎排</button>
               <button data-layout="horizontal">橫排</button>
@@ -218,7 +237,68 @@
             <label>字號</label>
             <div class="range-wrap"><input type="range" id="fontRange" min="17" max="32" step="1" value="21"><span id="fontRangeValue">21 px</span></div>
           </div>
-          <p class="setting-desc">宋體、黑體、楷體分別使用隨程式附帶的 Noto Serif、Noto Sans、霞鶩文楷（皆為 SIL OFL 1.1）；西文優先使用本機的 Times New Roman。字體檔不嵌入 PDF。</p>
+          <div class="setting-row">
+            <label>行距</label>
+            <div class="segmented" id="lineHeightSeg">
+              <button data-line="tight">緊湊</button>
+              <button data-line="normal" class="active">標準</button>
+              <button data-line="loose">寬鬆</button>
+            </div>
+          </div>
+          <div class="setting-row">
+            <label>段距</label>
+            <div class="segmented" id="paraGapSeg">
+              <button data-gap="tight">緊湊</button>
+              <button data-gap="normal" class="active">標準</button>
+              <button data-gap="loose">寬鬆</button>
+            </div>
+          </div>
+          <div class="setting-row">
+            <label>正文寬</label>
+            <div class="segmented" id="textWidthSeg">
+              <button data-width="narrow">窄</button>
+              <button data-width="normal" class="active">標準</button>
+              <button data-width="wide">寬</button>
+            </div>
+          </div>
+          <div class="setting-row">
+            <label>豎排列距</label>
+            <div class="segmented" id="columnGapSeg">
+              <button data-colgap="tight">緊湊</button>
+              <button data-colgap="normal" class="active">標準</button>
+              <button data-colgap="loose">寬鬆</button>
+            </div>
+          </div>
+          <p class="setting-desc">宋體、黑體、楷體分別使用隨程式附帶的 Noto Serif、Noto Sans、霞鶩文楷（皆為 SIL OFL 1.1）；西文優先使用本機的 Times New Roman。</p>
+        </section>
+
+        <section>
+          <h4>行為</h4>
+          <div class="setting-row">
+            <label>回復閱讀</label>
+            <div class="segmented" id="restoreSeg">
+              <button data-on="1" class="active">記住上次</button>
+              <button data-on="0">每次從頭</button>
+            </div>
+          </div>
+          <div class="setting-row">
+            <label>自動保存</label>
+            <div class="segmented" id="progressSeg">
+              <button data-on="1" class="active">開</button>
+              <button data-on="0">關</button>
+            </div>
+          </div>
+          <div class="setting-row">
+            <label>OCR 預設</label>
+            <div class="segmented" id="ocrDefaultSeg">
+              <button data-quality="fast" class="active">快速</button>
+              <button data-quality="high">精校</button>
+            </div>
+          </div>
+          <div class="setting-inline setting-reset">
+            <span>設定只保存在本機。</span>
+            <button class="ghost" id="resetSettings">恢復預設</button>
+          </div>
         </section>
 
         <section>
@@ -231,7 +311,7 @@
             <input id="ocrEnd" type="number" min="1" value="52">
           </div>
           <div class="setting-row">
-            <label>模式</label>
+            <label>本次模式</label>
             <div class="segmented" id="ocrQualitySeg">
               <button data-quality="fast" class="active">快速</button>
               <button data-quality="high">精校（慢）</button>
@@ -242,7 +322,7 @@
             <div class="ocr-bar"><i id="ocrBar"></i></div>
           </div>
           <div class="setting-inline"><span id="ocrState">尚未開始</span><div class="inline-actions"><button class="ghost" id="viewOcr">查看識別初稿</button><button class="primary small" id="startOcr">開始識別</button></div></div>
-          <p class="setting-desc setting-warn">對已導入的書重跑同一段頁碼，會替換那幾頁的正文；該頁上的批註也會一併移除。建議先備份 data 目錄。</p>
+          <p class="setting-desc setting-warn">對已導入的書重跑同一段頁碼，會替換那幾頁的正文；該頁上的批註也會一併移除。</p>
         </section>
 
         <section class="about">

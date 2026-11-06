@@ -577,6 +577,64 @@ body.focus .reader-text.horizontal { padding-top: 40px; }
 .import-progress { margin-top: 2px; }
 .setting-warn { margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--line-soft); opacity: .85; }
 
+/* ---------- settings readability / UI scale ---------- */
+:root { --ui-scale: 1; }
+body[data-ui-size="small"] { --ui-scale: .92; }
+body[data-ui-size="medium"] { --ui-scale: 1; }
+body[data-ui-size="large"] { --ui-scale: 1.14; }
+
+.settings-modal { width: min(94vw, 820px); }
+.settings-body { gap: 24px; }
+.settings-body h4 { font-size: calc(17px * var(--ui-scale)); margin-bottom: 14px; }
+.section-tag { font-size: calc(9px * var(--ui-scale)); }
+.setting-desc { font-size: calc(12px * var(--ui-scale)); line-height: 1.8; margin: -2px 0 14px; }
+.setting-row { gap: 14px; margin: 11px 0; }
+.setting-row label { width: calc(94px * var(--ui-scale)); font-size: calc(13px * var(--ui-scale)); }
+.setting-row.two input[type="number"] { width: 86px; }
+.setting-row input[type="text"], .setting-row input[type="password"], .setting-row input[type="number"], .setting-row input[type="search"] { font-size: calc(14px * var(--ui-scale)); }
+.segmented button { font-size: calc(12px * var(--ui-scale)); padding: 8px 15px; }
+.range-wrap span { font-size: calc(12px * var(--ui-scale)); min-width: 52px; }
+.mini-select { font-size: calc(12px * var(--ui-scale)); padding: 7px 9px; }
+.setting-inline { font-size: calc(12px * var(--ui-scale)); margin-top: 14px; }
+.setting-inline .ghost { font-size: calc(12px * var(--ui-scale)); padding: 7px 12px; }
+.setting-reset { border-top: 1px dashed var(--line-soft); padding-top: 12px; margin-top: 16px; }
+.settings-body .credit { font-size: calc(11px * var(--ui-scale)); }
+
+/* UI font size: scale the chrome without changing layout boxes. */
+.tool { font-size: calc(12px * var(--ui-scale)); }
+.crumb { font-size: calc(13px * var(--ui-scale)); }
+.brand-text span { font-size: calc(9px * var(--ui-scale)); }
+.font-step button { font-size: calc(11px * var(--ui-scale)); }
+.side-tabs button { font-size: calc(12px * var(--ui-scale)); }
+.book-card-title { font-size: calc(20px * var(--ui-scale)); }
+.book-card-kicker, .book-card-foot, .book-card-meta { font-size: calc(10px * var(--ui-scale)); }
+.pane-label { font-size: calc(10px * var(--ui-scale)); }
+.toc-main b { font-size: calc(13px * var(--ui-scale)); }
+.toc-main span, .toc-vol { font-size: calc(10px * var(--ui-scale)); }
+.toc-status, .statusbar, .status-btn { font-size: calc(10px * var(--ui-scale)); }
+.chapter-kicker, .chapter-meta { font-size: calc(11px * var(--ui-scale)); }
+.panel-tabs button { font-size: calc(13px * var(--ui-scale)); }
+.notes-intro, .trans-text, .footnote-item .fn-text { font-size: calc(12px * var(--ui-scale)); }
+.selection-menu button { font-size: calc(11px * var(--ui-scale)); }
+.toast { font-size: calc(12px * var(--ui-scale)); }
+
+/* Reader spacing / width variables. */
+.reader-text.vertical { gap: var(--column-gap, 1.9em); }
+.reader-text.vertical .v-col { line-height: var(--reader-line-height, 1.62); }
+.reader-text.vertical .v-col.para-end { margin-left: calc((var(--para-gap, 1) - 1) * 1.4em); }
+.reader-text.horizontal {
+  max-width: var(--reader-width, 820px);
+  line-height: var(--reader-line-height, 1.98);
+}
+.reader-text.horizontal .hp { margin-bottom: calc(1.05em * var(--para-gap, 1)); }
+
+/* Accessibility: turn off non-essential motion. */
+body.reduce-motion *, body.reduce-motion *::before, body.reduce-motion *::after {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}
+
 /* ---------- responsive ---------- */
 @media (max-width: 1180px) {
   :root { --sidebar: 252px; --panel-w: 330px; }
