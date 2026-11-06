@@ -5,6 +5,7 @@ import mimetypes
 import re
 import shutil
 import threading
+import time
 import traceback
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -281,7 +282,30 @@ class Handler(BaseHTTPRequestHandler):
             if not job:
                 return self.send_error_json("任务不存在", 404)
             job["cancel"] = True
-            return self.send_json({"ok": True})
+            job["pause"] = False
+            if job.get("status") not in {"done", "error", "cancelled"}:
+                job["message"] = "正在停止…"
+            return self.send_json({"job": job})
+        m = re.fullmatch(r"/api/ocr/jobs/([^/]+)/pause", path)
+        if m:
+            job = OCR_JOBS.get(m.group(1))
+            if not job:
+                return self.send_error_json("任务不存在", 404)
+            if job.get("status") in {"done", "error", "cancelled"}:
+                return self.send_error_json("任務已結束", 409)
+            job["pause"] = True
+            job["message"] = "正在暫停，當前頁完成後停止…"
+            return self.send_json({"job": job})
+        m = re.fullmatch(r"/api/ocr/jobs/([^/]+)/resume", path)
+        if m:
+            job = OCR_JOBS.get(m.group(1))
+            if not job:
+                return self.send_error_json("任务不存在", 404)
+            if job.get("status") in {"done", "error", "cancelled"}:
+                return self.send_error_json("任務已結束", 409)
+            job["pause"] = False
+            job["message"] = "繼續識別"
+            return self.send_json({"job": job})
         return self.send_error_json("接口不存在", 404)
 
     def api_patch(self, path: str):
@@ -527,10 +551,13 @@ class Handler(BaseHTTPRequestHandler):
             "skip_front_matter": bool(payload.get("skip_front_matter", True)),
             "status": "queued",
             "done": 0,
+            "processed": 0,
             "total": end - start + 1,
+            "percent": 0,
             "current": start,
             "message": "等待開始",
             "cancel": False,
+            "pause": False,
         }
         OCR_JOBS[job_id] = job
         threading.Thread(target=run_ocr_job, args=(job,), daemon=True).start()
@@ -567,10 +594,13 @@ class Handler(BaseHTTPRequestHandler):
             "skip_front_matter": True,
             "status": "queued",
             "done": 0,
+            "processed": 0,
             "total": end - start + 1,
+            "percent": 0,
             "current": start,
             "message": "等待開始",
             "cancel": False,
+            "pause": False,
         }
         OCR_JOBS[job_id] = job
         threading.Thread(target=run_ocr_job, args=(job,), daemon=True).start()
@@ -625,13 +655,21 @@ def run_ocr_job(job: dict):
         if importing:
             db.delete_paragraphs_for_pages(chapter_id, job["start"], job["end"])
         for n in range(job["start"], job["end"] + 1):
+            while job.get("pause") and not job.get("cancel"):
+                if job.get("status") != "paused":
+                    job["status"] = "paused"
+                    job["message"] = "已暫停"
+                time.sleep(0.4)
             if job.get("cancel"):
                 job["status"] = "cancelled"
-                job["message"] = "已取消"
+                job["message"] = "已停止"
                 if importing:
                     db.update_chapter(chapter_id, status="ready")
                     db.update_book(job["book_id"], status="ready")
                 return
+            if job.get("status") == "paused":
+                job["status"] = "running"
+                job["message"] = "繼續識別"
             job["current"] = n
             try:
                 result = ocr.analyze_page(
@@ -711,6 +749,8 @@ def run_ocr_job(job: dict):
                     kind=page_kind,
                 )
                 job["done"] += 1
+                job["processed"] = job.get("processed", 0) + 1
+                job["percent"] = round(job["processed"] / max(1, job["total"]) * 100)
                 job["message"] = (
                     f"第 {n} 頁：{skipped_label}，已略過"
                     if skipped_label
@@ -719,8 +759,11 @@ def run_ocr_job(job: dict):
             except Exception as exc:
                 traceback.print_exc()
                 db.store_ocr_page(job["book_id"], n, "error", None, [])
+                job["processed"] = job.get("processed", 0) + 1
+                job["percent"] = round(job["processed"] / max(1, job["total"]) * 100)
                 job["message"] = f"第 {n} 頁失敗：{exc}"
         job["status"] = "done"
+        job["percent"] = 100
         job["message"] = f"完成 {job['done']} 頁"
         if importing:
             db.update_chapter(chapter_id, status="ready")

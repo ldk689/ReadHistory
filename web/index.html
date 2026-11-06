@@ -149,10 +149,23 @@
           <div class="status-right">
             <button id="focusBtn" class="status-btn">專注</button>
             <button id="themeBtn" class="status-btn">紙色</button>
-            <span class="app-version">v0.2.5</span>
+            <span class="app-version">v0.2.6</span>
             <span id="clock">--:--</span>
           </div>
         </footer>
+        <div class="ocr-taskbar" id="ocrTaskbar" hidden>
+          <div class="ocr-task-main">
+            <div class="ocr-task-head">
+              <span id="ocrTaskText">識別中…</span>
+              <b id="ocrTaskPct">0%</b>
+            </div>
+            <div class="ocr-bar"><i id="ocrTaskBar"></i></div>
+          </div>
+          <div class="ocr-task-actions">
+            <button class="ghost small" id="ocrPauseBtn">暫停</button>
+            <button class="ghost small danger" id="ocrStopBtn">停止</button>
+          </div>
+        </div>
       </main>
     </div>
   </div>

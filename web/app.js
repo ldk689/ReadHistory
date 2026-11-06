@@ -54,6 +54,8 @@
     editingAnn: null,
     ocr: null,
     ocrPoll: null,
+    ocrTaskJob: null,
+    ocrTaskHideTimer: null,
     importJob: null,
     importJobPoll: null,
     importing: {
@@ -151,6 +153,7 @@
       el.app.hidden = false;
       await openBook(bookId, chapterId);
       await refreshOcrStatus();
+      await restoreOcrTask();
       if (params.get("settings") === "1") setTimeout(openSettings, 350);
       if (params.get("library") === "1") setTimeout(() => { renderLibrary(); el.libraryModal.hidden = false; }, 350);
       if (params.get("import") === "1") setTimeout(openImport, 350);
@@ -183,6 +186,7 @@
       "ocrDefaultSeg", "resetSettings",
       "ocrStart", "ocrEnd", "ocrQualitySeg", "ocrProgress",
       "ocrProgressText", "ocrProgressPct", "ocrBar", "ocrState", "startOcr",
+      "ocrTaskbar", "ocrTaskText", "ocrTaskPct", "ocrTaskBar", "ocrPauseBtn", "ocrStopBtn",
       "ocrModal", "ocrPageSelect", "ocrConfidence", "ocrText", "copyOcr", "saveOcr", "viewOcr",
       "libraryModal", "libraryGrid", "importedGrid", "librarySummary", "libraryImportBtn",
       "searchModal", "searchTitle", "searchInput", "searchResults",
@@ -1071,6 +1075,114 @@
     }
   }
 
+  function ocrJobPercent(info) {
+    if (Number.isFinite(info?.percent)) return Math.max(0, Math.min(100, Math.round(info.percent)));
+    const total = Number(info?.total) || 0;
+    const processed = Number(info?.processed ?? info?.done) || 0;
+    return total ? Math.max(0, Math.min(100, Math.round((processed / total) * 100))) : 0;
+  }
+
+  function rememberOcrTask(job) {
+    if (!job || !job.id) return;
+    try {
+      localStorage.setItem("qj-ocr-job", JSON.stringify({
+        id: job.id,
+        kind: job.kind || "ocr",
+        book_id: job.book_id || null,
+        chapter_id: job.chapter_id || null,
+      }));
+    } catch (_) { /* storage may be unavailable */ }
+  }
+
+  function forgetOcrTask() {
+    try { localStorage.removeItem("qj-ocr-job"); } catch (_) { /* ignore */ }
+  }
+
+  function setOcrTask(info) {
+    if (!info) return;
+    clearTimeout(state.ocrTaskHideTimer);
+    state.ocrTaskJob = info;
+    const terminal = ["done", "error", "cancelled"].includes(info.status);
+    const total = Number(info.total) || 0;
+    const processed = Number(info.processed ?? info.done) || 0;
+    const pct = ocrJobPercent(info);
+    el.ocrTaskbar.hidden = false;
+    el.ocrTaskbar.dataset.state = info.status || "running";
+    el.ocrTaskBar.style.width = pct + "%";
+    el.ocrTaskPct.textContent = pct + "%";
+    el.ocrPauseBtn.disabled = terminal;
+    el.ocrStopBtn.disabled = terminal;
+    if (terminal) {
+      el.ocrPauseBtn.textContent = "暫停";
+      el.ocrTaskText.textContent = info.status === "done"
+        ? `識別完成 · ${info.done || 0} 頁`
+        : (info.message || (info.status === "cancelled" ? "已停止" : "識別失敗"));
+      forgetOcrTask();
+      const delay = info.status === "done" ? 6000 : 9000;
+      state.ocrTaskHideTimer = setTimeout(() => {
+        el.ocrTaskbar.hidden = true;
+        state.ocrTaskJob = null;
+      }, delay);
+      return;
+    }
+    if (info.status === "paused") {
+      el.ocrPauseBtn.textContent = "繼續";
+      el.ocrTaskText.textContent = `已暫停 · 第 ${info.current || 0} / ${info.end || total} 頁`;
+    } else if (info.pause) {
+      el.ocrPauseBtn.textContent = "暫停";
+      el.ocrTaskText.textContent = `正在暫停 · ${processed} / ${total} 頁`;
+    } else {
+      el.ocrPauseBtn.textContent = "暫停";
+      el.ocrTaskText.textContent = `識別中 · 第 ${info.current || 0} / ${info.end || total} 頁`;
+    }
+    rememberOcrTask(info);
+  }
+
+  async function restoreOcrTask() {
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem("qj-ocr-job") || "null"); } catch (_) {}
+    if (!saved?.id) return;
+    try {
+      const { job } = await api(`/api/ocr/jobs/${saved.id}`);
+      if (["done", "error", "cancelled"].includes(job.status)) {
+        forgetOcrTask();
+        return;
+      }
+      setOcrTask(job);
+      if (job.kind === "import" && job.chapter_id) {
+        pollImportJob(job, job.book_id, job.chapter_id);
+      } else {
+        pollOcr(job, false);
+      }
+    } catch (_) {
+      forgetOcrTask();
+    }
+  }
+
+  async function pauseResumeOcr() {
+    const job = state.ocrTaskJob;
+    if (!job?.id) return;
+    const action = job.status === "paused" ? "resume" : "pause";
+    try {
+      const res = await api(`/api/ocr/jobs/${job.id}/${action}`, { method: "POST" });
+      setOcrTask(res.job);
+    } catch (err) {
+      toast(err.message, 4000);
+    }
+  }
+
+  async function stopOcrTask() {
+    const job = state.ocrTaskJob;
+    if (!job?.id) return;
+    if (!confirm("停止識別？已識別的頁面會保留，之後可以重新識別剩餘頁碼。")) return;
+    try {
+      const res = await api(`/api/ocr/jobs/${job.id}/cancel`, { method: "POST" });
+      setOcrTask(res.job);
+    } catch (err) {
+      toast(err.message, 4000);
+    }
+  }
+
   async function startOcr() {
     const start = Number(el.ocrStart.value);
     const end = Number(el.ocrEnd.value);
@@ -1086,6 +1198,7 @@
       el.ocrProgressPct.textContent = "0%";
       el.ocrProgressText.textContent = `排隊中 · 第 ${start}–${end} 頁`;
       toast("OCR 任務已開始");
+      setOcrTask(res.job);
       pollOcr(res.job, true);
     } catch (err) { toast(err.message, 4000); }
   }
@@ -1095,7 +1208,8 @@
     state.ocrPoll = setInterval(async () => {
       try {
         const { job: info } = await api(`/api/ocr/jobs/${job.id}`);
-        const pct = info.total ? Math.round((info.done / info.total) * 100) : 0;
+        setOcrTask(info);
+        const pct = ocrJobPercent(info);
         el.ocrBar.style.width = pct + "%";
         el.ocrProgressPct.textContent = pct + "%";
         el.ocrProgressText.textContent = info.message;
@@ -1386,6 +1500,7 @@
       state.importJob = res.job;
       el.importModal.hidden = true;
       toast(`已開始識別《${res.book.title}》：第 ${start}–${end} 頁`, 4200);
+      setOcrTask(res.job);
       await openBook(res.book.id, res.chapter.id);
       pollImportJob(res.job, res.book.id, res.chapter.id);
     } catch (err) {
@@ -1402,10 +1517,14 @@
       try {
         const { job: info } = await api(`/api/ocr/jobs/${job.id}`);
         state.importJob = info;
+        setOcrTask(info);
+        const pct = ocrJobPercent(info);
         if (state.bookId === bookId) {
-          el.statusText.textContent = info.status === "running"
-            ? `識別中 · 第 ${info.current} / ${info.end} 頁`
-            : info.message;
+          el.statusText.textContent = info.status === "paused"
+            ? `已暫停 · ${pct}%`
+            : info.status === "running"
+              ? `識別中 · 第 ${info.current} / ${info.end} 頁 · ${pct}%`
+              : info.message;
           if (state.chapterId === chapterId && info.status === "running" && info.done > 0) {
             const data = await api(`/api/books/${bookId}/chapters/${chapterId}`);
             if ((data.paragraphs || []).length !== state.paragraphs.length) {
@@ -1427,6 +1546,9 @@
             }
           } else {
             toast(info.message, 6000);
+            if (info.status === "cancelled" && state.bookId === bookId) {
+              try { await openBook(bookId, chapterId); } catch (_) {}
+            }
           }
         }
       } catch (err) {
@@ -1618,6 +1740,8 @@
     el.fontRange.addEventListener("input", () => applyFont(Number(el.fontRange.value), false));
     el.fontRange.addEventListener("change", () => saveReaderPrefs());
     el.startOcr.addEventListener("click", startOcr);
+    el.ocrPauseBtn.addEventListener("click", pauseResumeOcr);
+    el.ocrStopBtn.addEventListener("click", stopOcrTask);
     el.viewOcr.addEventListener("click", () => openOcrReview());
     el.ocrPageSelect.addEventListener("change", () => loadOcrPage(Number(el.ocrPageSelect.value)));
     el.saveOcr.addEventListener("click", saveOcrReview);
