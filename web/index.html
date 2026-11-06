@@ -149,7 +149,7 @@
           <div class="status-right">
             <button id="focusBtn" class="status-btn">專注</button>
             <button id="themeBtn" class="status-btn">紙色</button>
-            <span class="app-version">v0.2.1</span>
+            <span class="app-version">v0.2.2</span>
             <span id="clock">--:--</span>
           </div>
         </footer>
@@ -395,7 +395,7 @@
                 <option value="270">270°</option>
               </select>
             </div>
-            <div class="import-detect" id="importDetectState">選中 PDF 後，會先試讀一兩頁，判斷豎排或橫排。</div>
+            <div class="import-detect" id="importDetectState">選中 PDF 後，會抽樣幾頁正文，判斷豎排或橫排。</div>
             <div class="setting-row two">
               <label>頁碼</label>
               <input id="importStart" type="number" min="1" value="1">
@@ -406,6 +406,12 @@
               <div class="segmented" id="importQualitySeg">
                 <button data-quality="fast" class="active">快速</button>
                 <button data-quality="high">精校（慢）</button>
+              </div>
+            </div>
+            <div class="setting-row"><label>前置頁</label>
+              <div class="segmented" id="importSkipSeg">
+                <button data-skip="1" class="active">自動略過</button>
+                <button data-skip="0">保留</button>
               </div>
             </div>
           </div>

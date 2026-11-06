@@ -183,7 +183,7 @@
       "importModal", "importDrop", "importFile", "importFileName", "importDropTitle",
       "importDetail", "importPreview", "importPreviewEmpty", "importBookTitle", "importAuthor",
       "importChapterTitle", "importLayoutSeg", "importRotation", "importDetectState", "importStart", "importEnd",
-      "importQualitySeg", "importProgress", "importProgressText", "importProgressPct",
+      "importQualitySeg", "importSkipSeg", "importProgress", "importProgressText", "importProgressPct",
       "importProgressBar", "importAnalyzeBtn", "importCommitBtn", "importHint",
     ];
     ids.forEach((id) => { el[id] = document.getElementById(id); });
@@ -1198,7 +1198,7 @@
   function openImport() {
     state.importing = {
       file: null, id: null, meta: null, suggestion: null,
-      layout: "auto", quality: state.ocrDefault, uploading: false, analyzing: false,
+      layout: "auto", quality: state.ocrDefault, skipFrontMatter: true, uploading: false, analyzing: false,
     };
     el.importFile.value = "";
     el.importDetail.hidden = true;
@@ -1213,6 +1213,7 @@
     $$("#importLayoutSeg button").forEach((b) => b.classList.toggle("active", b.dataset.layout === "auto"));
     el.importRotation.value = "auto";
     $$("#importQualitySeg button").forEach((b) => b.classList.toggle("active", b.dataset.quality === state.ocrDefault));
+    $$("#importSkipSeg button").forEach((b) => b.classList.toggle("active", (b.dataset.skip === "1") === state.importing.skipFrontMatter));
     el.importModal.hidden = false;
   }
 
@@ -1272,7 +1273,7 @@
       el.importStart.max = meta.pages;
       el.importEnd.value = Math.min(meta.pages, 20);
       el.importEnd.max = meta.pages;
-      el.importDetectState.textContent = `共 ${meta.pages} 頁。先試讀第 1 頁，判斷豎排或橫排…`;
+      el.importDetectState.textContent = `共 ${meta.pages} 頁。正在抽樣正文頁，判斷豎排或橫排…`;
       el.importAnalyzeBtn.disabled = false;
       el.importCommitBtn.disabled = false;
       analyzeImport();
@@ -1291,7 +1292,7 @@
     imp.analyzing = true;
     el.importAnalyzeBtn.disabled = true;
     el.importCommitBtn.disabled = true;
-    el.importDetectState.textContent = "正在試讀一兩頁，判斷版式與方向…（約 5–15 秒）";
+    el.importDetectState.textContent = "正在抽樣最多 8 頁正文，判斷版式與方向…（約 1–3 分鐘）";
     el.importProgress.hidden = false;
     el.importProgressBar.style.width = "35%";
     el.importProgressPct.textContent = "…";
@@ -1307,13 +1308,20 @@
       const s = res.suggestion;
       const names = { vertical: "豎排", horizontal: "橫排" };
       const agree = imp.layout === "auto" || imp.layout === s.layout;
+      const sample = (s.pages || []).find((p) => p.page === s.page) || (s.pages || [])[0];
       el.importDetectState.innerHTML = `判斷：<b>${names[s.layout]}</b> · 置信度 ${Math.round((s.confidence || 0) * 100)}% · 掃描方向 ${s.rotation}°`
+        + (s.page ? ` · 取樣第 ${s.page} 頁` : "")
         + (agree ? "" : `（你手動選擇了${names[imp.layout]}，將以手動為準）`)
-        + (s.pages && s.pages[0] ? `<br><span class="detect-sample">試讀：${esc(s.pages[0].sample || "").slice(0, 48)}…</span>` : "")
+        + (sample ? `<br><span class="detect-sample">試讀：${esc(sample.sample || "").slice(0, 48)}…</span>` : "")
         + (s.warning ? `<br><span class="detect-warning">${esc(s.warning)}</span>` : "");
       el.importProgress.hidden = true;
       el.importCommitBtn.disabled = false;
-      el.importHint.textContent = `將識別第 ${el.importStart.value}–${el.importEnd.value} 頁。頁數多時需要較長時間，可在識別期間先離開此視窗。`;
+      const startNo = Number(el.importStart.value) || 1;
+      const endNo = Number(el.importEnd.value) || startNo;
+      const count = Math.max(1, endNo - startNo + 1);
+      el.importHint.textContent = count > 200
+        ? `將識別 ${count} 頁，可能需要數小時；建議先導入 10–20 頁試讀，確認版式與方向後再擴大範圍。`
+        : `將識別第 ${startNo}–${endNo} 頁。頁數多時需要較長時間，可在識別期間先離開此視窗。`;
     } catch (err) {
       el.importDetectState.textContent = "自動判斷失敗：" + err.message + "。請手動選擇豎排或橫排，再按「重新識別版式」。";
       el.importProgress.hidden = true;
@@ -1337,6 +1345,10 @@
       toast("請填寫有效的頁碼範圍");
       return;
     }
+    if (end - start + 1 > 200) {
+      const ok = confirm(`這次要識別 ${end - start + 1} 頁，可能需要數小時。\n\n建議先導入 10–20 頁確認版式與識別品質，再擴大範圍。\n\n仍要繼續嗎？`);
+      if (!ok) return;
+    }
     const layout = imp.layout === "auto" ? imp.suggestion?.layout : imp.layout;
     if (!layout) { toast("請先按「重新識別版式」，或手動選擇豎排/橫排"); return; }
     const rotation = el.importRotation.value !== "auto"
@@ -1358,6 +1370,7 @@
           author: el.importAuthor.value.trim(),
           chapter_title: el.importChapterTitle.value.trim(),
           layout, rotation, start, end, quality,
+          skip_front_matter: state.importing.skipFrontMatter,
         }),
       });
       imp.id = null;
@@ -1608,6 +1621,10 @@
     }));
     $$("#importQualitySeg button").forEach((b) => b.addEventListener("click", () => {
       $$("#importQualitySeg button").forEach((x) => x.classList.toggle("active", x === b));
+    }));
+    $$("#importSkipSeg button").forEach((b) => b.addEventListener("click", () => {
+      state.importing.skipFrontMatter = b.dataset.skip === "1";
+      $$("#importSkipSeg button").forEach((x) => x.classList.toggle("active", x === b));
     }));
 
     el.searchInput.addEventListener("input", doSearch);

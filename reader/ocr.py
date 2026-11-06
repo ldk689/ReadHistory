@@ -561,6 +561,40 @@ def _paragraphs_vertical(lines: list[dict[str, Any]], page_no: int, char_size: f
     return paragraphs
 
 
+def classify_page(text: str, line_count: int = 0) -> str:
+    """Classify a page as cover / copyright / toc / body / other.
+
+    This is intentionally conservative: only pages that clearly look like
+    front matter are skipped. A page with little text and few lines is a
+    cover or plate; publication metadata and dot-leader page numbers are
+    copyright/TOC markers.
+    """
+    compact = re.sub(r"\s", "", text or "")
+    chars = len(compact)
+    if chars < 12:
+        return "cover"
+    cjk = sum(1 for ch in compact if "\u3400" <= ch <= "\u9fff")
+    digits = sum(1 for ch in compact if ch.isdigit())
+    dots = len(re.findall(r"[…\.．·・]", compact))
+    cjk_ratio = cjk / chars
+    digit_ratio = digits / chars
+    dot_ratio = dots / chars
+    if line_count and line_count <= 4 and chars < 80:
+        return "cover"
+    if re.search(r"目錄|目次|總目|总目|索引", compact):
+        return "toc"
+    if re.search(
+        r"出版|發行|发行|印刷|定價|定价|書號|书号|ISBN|開本|开本|印張|印张|版次|印次|新華書店|新华书店|版權|版权",
+        compact,
+    ) and (digit_ratio > 0.025 or chars < 260):
+        return "copyright"
+    if line_count >= 8 and (digit_ratio > 0.16 or dot_ratio > 0.04):
+        return "toc"
+    if chars >= 40 and cjk_ratio > 0.45 and digit_ratio < 0.18:
+        return "body"
+    return "other"
+
+
 def _is_running_head(text: str) -> bool:
     compact = text.replace(" ", "")
     if re.fullmatch(r"[一二三四五六七八九十百千〇零\dⅠⅡⅢIVX]+", compact):

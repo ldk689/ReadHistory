@@ -374,13 +374,24 @@ class Handler(BaseHTTPRequestHandler):
         if forced not in ("vertical", "horizontal"):
             forced = None
         start = max(1, int(payload.get("page") or payload.get("start") or 1))
+        # Covers, copyright pages and tables of contents often have a different
+        # orientation from the body. Sampling only the first pages was why a
+        # whole-book import could be locked to a wrong rotation (e.g. page 1 at
+        # 0°/270° while the body is 90°). Sample across the first part of the
+        # book and keep the page that produces the most confident text.
         candidates = []
-        for page_no in (start, start + 1, start + 2):
+        for offset in (0, 10, 40, 80, 160):
+            page_no = start + offset
             if 1 <= page_no <= meta["pages"] and page_no not in candidates:
                 candidates.append(page_no)
-        for page_no in (1, 2, 3):
+        # Sample deeper into the book so a long preface or table section
+        # cannot outvote the actual body.
+        for ratio in (0.10, 0.25, 0.50):
+            page_no = max(1, int(meta["pages"] * ratio))
             if page_no <= meta["pages"] and page_no not in candidates:
                 candidates.append(page_no)
+        if not candidates:
+            candidates = [1]
 
         results = []
         for page_no in candidates:
@@ -391,20 +402,34 @@ class Handler(BaseHTTPRequestHandler):
                 continue
             if probe:
                 results.append(probe)
-            # Front matter and plates often contain only a few glyphs; skip
-            # them and look at the next page before deciding.
-            if len(results) >= 2 and all((r.get("chars") or 0) >= 20 for r in results):
-                break
         if not results:
             return self.send_error_json("這幾頁沒有找到可識別的文字，請換一個頁碼或手動指定版式", 422)
-        good = [r for r in results if (r.get("chars") or 0) >= 20] or results
-        layouts = [r["layout"] for r in good]
-        layout = max(set(layouts), key=layouts.count)
-        rotations = [r["rotation"] for r in good if r["layout"] == layout]
-        rotation = max(set(rotations), key=rotations.count) if rotations else 0
-        confidence = max((r.get("confidence") or 0) for r in good)
+        # Stay out of the first ~2% of the book when possible: that is where
+        # covers, copyright pages and prefaces with a different orientation
+        # live. Fall back to every sample for short books.
+        body_threshold = max(start, int(meta["pages"] * 0.02))
+        eligible = [
+            r
+            for r in results
+            if (r.get("page") or 0) >= body_threshold and (r.get("chars") or 0) >= 20
+        ] or results
+
+        def score(r):
+            return (r.get("chars") or 0) * max(0.2, r.get("confidence") or 0)
+
+        layout_scores = {}
+        for r in eligible:
+            layout_scores[r["layout"]] = layout_scores.get(r["layout"], 0) + score(r)
+        layout = max(layout_scores, key=layout_scores.get)
+        same_layout = [r for r in eligible if r["layout"] == layout]
+        rotation_scores = {}
+        for r in same_layout:
+            rotation_scores[r["rotation"]] = rotation_scores.get(r["rotation"], 0) + score(r)
+        rotation = max(rotation_scores, key=rotation_scores.get)
+        best = max(same_layout, key=score)
+        confidence = best.get("confidence") or 0
         warning = ""
-        if max((r.get("chars") or 0) for r in results) < 20:
+        if (best.get("chars") or 0) < 20:
             warning = "這幾頁文字太少，自動判斷可能不準；請換一個正文頁碼，或手動選擇豎排 / 橫排。"
         return self.send_json(
             {
@@ -412,6 +437,7 @@ class Handler(BaseHTTPRequestHandler):
                     "layout": layout,
                     "rotation": rotation,
                     "confidence": round(float(confidence), 3),
+                    "page": best.get("page"),
                     "pages": results,
                     "warning": warning,
                 },
@@ -498,6 +524,7 @@ class Handler(BaseHTTPRequestHandler):
             "quality": quality,
             "layout": layout,
             "rotation": int(payload.get("rotation") or 0),
+            "skip_front_matter": bool(payload.get("skip_front_matter", True)),
             "status": "queued",
             "done": 0,
             "total": end - start + 1,
@@ -537,6 +564,7 @@ class Handler(BaseHTTPRequestHandler):
             "quality": quality,
             "layout": book.get("layout") or "horizontal",
             "rotation": int(rotation) if rotation is not None else None,
+            "skip_front_matter": True,
             "status": "queued",
             "done": 0,
             "total": end - start + 1,
@@ -615,6 +643,37 @@ def run_ocr_job(job: dict):
                     layout=layout,
                     rotation=int(rotation) if rotation is not None else None,
                 )
+                # Covers, copyright pages and fold-outs can be rotated
+                # differently from the body. If a fixed book orientation
+                # produced weak text, retry this page in the other plausible
+                # orientations and keep the better result.
+                avg = result.get("average_confidence")
+                if (
+                    importing
+                    and rotation is not None
+                    and avg is not None
+                    and avg < 0.55
+                ):
+                    try:
+                        probe = ocr.probe_page(src, n, forced_layout=layout)
+                        if (
+                            probe
+                            and probe.get("rotation") != int(rotation)
+                            and (probe.get("confidence") or 0) > avg + 0.05
+                        ):
+                            alt = ocr.analyze_page(
+                                src,
+                                n,
+                                book_id=job["book_id"],
+                                dpi=170,
+                                lang_rec=lang,
+                                layout=layout,
+                                rotation=int(probe["rotation"]),
+                            )
+                            if (alt.get("average_confidence") or 0) > avg:
+                                result = alt
+                    except Exception:
+                        traceback.print_exc()
                 db.store_ocr_page(
                     job["book_id"],
                     n,
@@ -622,21 +681,39 @@ def run_ocr_job(job: dict):
                     result.get("average_confidence"),
                     result.get("lines", []),
                 )
+                skipped_label = ""
                 if importing:
-                    for para in result.get("paragraphs", []):
-                        text = (para.get("text") or "").strip()
-                        if len(text) < 2:
-                            continue
-                        db.add_paragraph(
-                            chapter_id,
-                            db.next_paragraph_order(chapter_id),
-                            text,
-                            page_start=n,
-                            page_end=n,
-                            confidence=para.get("confidence"),
-                        )
+                    page_text = "".join(
+                        (para.get("text") or "") for para in result.get("paragraphs", [])
+                    )
+                    kind = ocr.classify_page(page_text, len(result.get("lines", [])))
+                    skip = job.get("skip_front_matter", True) and kind in {
+                        "cover",
+                        "copyright",
+                        "toc",
+                    }
+                    if skip:
+                        labels = {"cover": "封面", "copyright": "版權頁", "toc": "目錄"}
+                        skipped_label = labels.get(kind, "前置頁")
+                    else:
+                        for para in result.get("paragraphs", []):
+                            text = (para.get("text") or "").strip()
+                            if len(text) < 2:
+                                continue
+                            db.add_paragraph(
+                                chapter_id,
+                                db.next_paragraph_order(chapter_id),
+                                text,
+                                page_start=n,
+                                page_end=n,
+                                confidence=para.get("confidence"),
+                            )
                 job["done"] += 1
-                job["message"] = f"第 {n} 頁完成"
+                job["message"] = (
+                    f"第 {n} 頁：{skipped_label}，已略過"
+                    if skipped_label
+                    else f"第 {n} 頁完成"
+                )
             except Exception as exc:
                 traceback.print_exc()
                 db.store_ocr_page(job["book_id"], n, "error", None, [])
