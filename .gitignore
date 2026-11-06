@@ -4,6 +4,9 @@ data/reader.db-shm
 data/reader.db-wal
 data/pages/
 data/ocr/
+data/imports/
+data/library/
+data/assets/cover-*.jpg
 data/inbox/*.pdf
 
 # 依赖与构建产物
@@ -15,6 +18,7 @@ data/inbox/*.pdf
 .venv/
 vendor/
 .edge*/
+.build/
 .tmp/
 tmp/
 samples/

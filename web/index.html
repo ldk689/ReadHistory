@@ -3,11 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f1e7d4">
+  <meta name="theme-color" content="#f1e6cf">
   <title>青简 · ReadHistory · 二十四史阅读器</title>
   <link rel="stylesheet" href="/styles.css">
 </head>
-<body data-theme="paper">
+<body data-theme="paper" data-font="song">
   <div class="boot" id="boot">
     <div class="boot-seal">青</div>
     <div class="boot-text">正在展開書卷</div>
@@ -24,27 +24,27 @@
         <span>晉書</span><i>/</i><span>卷一</span><i>/</i><b>帝紀第一</b>
       </div>
       <div class="top-actions">
-        <button class="tool" id="layoutBtn" title="切换竖排 / 横排">
+        <button class="tool" id="layoutBtn" title="切換豎排 / 橫排">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16M12 4v16M17 4v10M4 20h16" /></svg>
-          <span id="layoutLabel">竖排</span>
+          <span id="layoutLabel">豎排</span>
         </button>
-        <button class="tool" id="transBtn" title="对照今译">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h9v13H5zM9 8h7M9 12h7M9 16h4M3 20h18" /></svg>
-          <span>今译</span>
+        <button class="tool" id="notesBtn" title="校勘記">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h9v16H5zM9 8h7M9 12h7M9 16h4M3 21h18" /></svg>
+          <span>校勘</span>
         </button>
-        <button class="tool" id="originalBtn" title="查看原扫描页">
+        <button class="tool" id="originalBtn" title="查看原掃描頁">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM8 9h8M8 13h8M8 17h5" /></svg>
           <span>原影</span>
         </button>
-        <div class="font-step" title="字号">
-          <button id="fontMinus" aria-label="缩小字号">A−</button>
+        <div class="font-step" title="字號">
+          <button id="fontMinus" aria-label="縮小字號">A−</button>
           <span id="fontValue">21</span>
-          <button id="fontPlus" aria-label="放大字号">A＋</button>
+          <button id="fontPlus" aria-label="放大字號">A＋</button>
         </div>
-        <button class="tool icon-only" id="searchBtn" title="全文检索">
+        <button class="tool icon-only" id="searchBtn" title="全文檢索">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m15.5 15.5 5 5" /></svg>
         </button>
-        <button class="tool icon-only" id="settingsBtn" title="设置">
+        <button class="tool icon-only" id="settingsBtn" title="設置">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2" /><path d="M12 2.8v3M12 18.2v3M2.8 12h3M18.2 12h3M5.5 5.5l2.1 2.1M16.4 16.4l2.1 2.1M18.5 5.5l-2.1 2.1M7.6 16.4l-2.1 2.1" /></svg>
         </button>
       </div>
@@ -52,20 +52,20 @@
 
     <div class="workspace">
       <aside class="sidebar">
-        <button class="book-card" id="bookCard" title="打开书库">
-          <img id="sideCover" alt="晉書封面">
+        <button class="book-card" id="bookCard" title="打開書庫">
+          <img id="sideCover" alt="書封">
           <div class="book-card-info">
             <div class="book-card-kicker">正在閱讀</div>
             <div class="book-card-title" id="sideTitle">晉書</div>
             <div class="book-card-meta" id="sideMeta">唐 · 房玄齡等撰</div>
             <div class="book-progress"><i id="sideProgress"></i></div>
-            <div class="book-card-foot"><span id="sideProgressText">卷一 · 宣帝</span><span>1 / 130 卷</span></div>
+            <div class="book-card-foot"><span id="sideProgressText">卷一 · 宣帝</span><span id="sideVolumeCount">1 / 130 卷</span></div>
           </div>
         </button>
 
         <div class="side-tabs" role="tablist">
           <button class="active" data-side-tab="toc" role="tab">目錄</button>
-          <button data-side-tab="marks" role="tab">批注 <em id="markCount">0</em></button>
+          <button data-side-tab="marks" role="tab">批註 <em id="markCount">0</em></button>
         </div>
 
         <div class="side-scroll">
@@ -84,6 +84,10 @@
           <button id="libraryBtn" class="side-link">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h5v16H4zM10 4h4v16h-4zM15.5 5l4 14.5" /></svg>
             書庫 · 二十四史
+          </button>
+          <button id="importBtn" class="side-link side-link-import">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14" /></svg>
+            導入 PDF
           </button>
           <div class="local-badge"><i></i> 本地保存 · 不上傳</div>
         </div>
@@ -107,45 +111,29 @@
             <div class="reader-empty" id="readerEmpty" hidden>
               <div class="empty-mark">未</div>
               <h2>此卷尚未展開</h2>
-              <p>原掃描頁需要先經 OCR 與校對。可在設定中選擇頁碼範圍，先識別一卷。</p>
-              <button class="primary" id="emptyOcrBtn">開始 OCR</button>
+              <p>掃描頁需要先經 OCR 與校對。可在設置中選擇頁碼範圍先識別，或直接導入一本 PDF。</p>
+              <button class="primary" id="emptyOcrBtn">開始識別</button>
             </div>
           </div>
 
           <aside class="original-panel" id="originalPanel" hidden>
             <div class="panel-head">
               <div><span class="panel-eyebrow">原掃描</span><b id="originalPageLabel">PDF 第 49 頁</b></div>
-              <button class="round-btn" id="closeOriginal" aria-label="关闭原影">×</button>
+              <button class="round-btn" id="closeOriginal" aria-label="關閉原影">×</button>
             </div>
             <div class="original-frame">
-              <img id="originalImage" alt="原扫描页">
+              <img id="originalImage" alt="原掃描頁">
             </div>
-            <div class="original-foot">已自動旋轉 90° 便於閱讀 · 可與正文對照</div>
+            <div class="original-foot">已按書本版式自動校正方向 · 可與正文對照</div>
           </aside>
 
-          <aside class="translation-panel" id="translationPanel">
+          <aside class="notes-panel" id="notesPanel" hidden>
             <div class="panel-head">
-              <div class="panel-tabs">
-                <button class="active" data-panel-tab="trans">今譯</button>
-                <button data-panel-tab="notes">校勘記</button>
-              </div>
-              <button class="round-btn" id="closeTrans" aria-label="关闭今译">×</button>
+              <div><span class="panel-eyebrow">校勘</span><b>校勘記</b></div>
+              <button class="round-btn" id="closeNotes" aria-label="關閉校勘記">×</button>
             </div>
-            <div class="panel-body" id="transBody">
-              <div class="trans-context" id="transContext">第 1 段 · 第 49 頁</div>
-              <div class="trans-text" id="transText">正在展開…</div>
-              <div class="trans-actions">
-                <button id="translateCurrent" class="ghost">重新生成此段今譯</button>
-                <span id="transModel" class="model-tag">人工校訂</span>
-              </div>
-              <div class="panel-rule"></div>
-              <div class="panel-note">
-                <b>今譯說明</b>
-                <p>樣章今譯由編者校訂；其餘篇章可在設定中接入 DeepSeek 或 OpenAI 兼容接口，按段生成並緩存。</p>
-              </div>
-            </div>
-            <div class="panel-body" id="notesBody" hidden>
-              <div class="notes-intro">中華書局點校本的校勘記，隨正文標記顯示。</div>
+            <div class="panel-body" id="notesBody">
+              <div class="notes-intro" id="notesIntro">中華書局點校本的校勘記，隨正文標記顯示。</div>
               <div id="footnoteList" class="footnote-list"></div>
             </div>
           </aside>
@@ -161,7 +149,7 @@
           <div class="status-right">
             <button id="focusBtn" class="status-btn">專注</button>
             <button id="themeBtn" class="status-btn">紙色</button>
-            <span class="app-version">v0.1.0</span>
+            <span class="app-version">v0.2.0</span>
             <span id="clock">--:--</span>
           </div>
         </footer>
@@ -171,16 +159,15 @@
 
   <div class="selection-menu" id="selectionMenu" hidden>
     <button data-act="highlight" title="高亮"><span class="swatch ochre"></span>高亮</button>
-    <button data-act="underline" title="划线"><span class="underline-icon">U</span>划线</button>
-    <button data-act="note" title="批注"><span class="note-icon">✎</span>批注</button>
-    <button data-act="translate" title="今译"><span class="trans-icon">譯</span>今譯</button>
-    <button data-act="copy" title="复制"><span class="copy-icon">⧉</span>複製</button>
+    <button data-act="underline" title="劃線"><span class="underline-icon">U</span>劃線</button>
+    <button data-act="note" title="批註"><span class="note-icon">✎</span>批註</button>
+    <button data-act="copy" title="複製"><span class="copy-icon">⧉</span>複製</button>
   </div>
 
   <div class="modal-backdrop" id="noteModal" hidden>
     <div class="modal note-modal" role="dialog" aria-modal="true" aria-labelledby="noteTitle">
       <div class="modal-head">
-        <div><span class="panel-eyebrow">批注</span><h3 id="noteTitle">寫下你的批注</h3></div>
+        <div><span class="panel-eyebrow">批註</span><h3 id="noteTitle">寫下你的批註</h3></div>
         <button class="round-btn" data-close="noteModal">×</button>
       </div>
       <div class="quote-box" id="noteQuote"></div>
@@ -189,7 +176,7 @@
         <span class="hint">保存在本機 · 可隨時修改</span>
         <div>
           <button class="ghost" data-close="noteModal">取消</button>
-          <button class="primary" id="saveNote">保存批注</button>
+          <button class="primary" id="saveNote">保存批註</button>
         </div>
       </div>
     </div>
@@ -220,23 +207,23 @@
             </div>
           </div>
           <div class="setting-row">
-            <label>字號</label>
-            <div class="range-wrap"><input type="range" id="fontRange" min="17" max="30" step="1" value="21"><span id="fontRangeValue">21 px</span></div>
+            <label>字體</label>
+            <div class="segmented" id="fontSeg">
+              <button data-font="song" class="active">宋體</button>
+              <button data-font="hei">黑體</button>
+              <button data-font="kai">楷體</button>
+            </div>
           </div>
-        </section>
-
-        <section>
-          <h4>今譯接口 <span class="section-tag">可選</span></h4>
-          <p class="setting-desc">支援 DeepSeek、OpenAI 以及任何 OpenAI 兼容接口。Key 只保存在本機資料庫。</p>
-          <div class="setting-row"><label>Base URL</label><input id="llmBase" type="text" placeholder="https://api.deepseek.com"></div>
-          <div class="setting-row"><label>模型</label><input id="llmModel" type="text" placeholder="deepseek-chat"></div>
-          <div class="setting-row"><label>API Key</label><input id="llmKey" type="password" placeholder="尚未配置"></div>
-          <div class="setting-inline"><span id="llmState">未配置</span><button class="ghost" id="saveLlm">保存接口</button></div>
+          <div class="setting-row">
+            <label>字號</label>
+            <div class="range-wrap"><input type="range" id="fontRange" min="17" max="32" step="1" value="21"><span id="fontRangeValue">21 px</span></div>
+          </div>
+          <p class="setting-desc">宋體、黑體、楷體分別使用隨程式附帶的 Noto Serif、Noto Sans、霞鶩文楷（皆為 SIL OFL 1.1）；西文優先使用本機的 Times New Roman。字體檔不嵌入 PDF。</p>
         </section>
 
         <section>
           <h4>OCR 與原影 <span class="section-tag">本地</span></h4>
-          <p class="setting-desc">掃描頁先自動糾正 90° 方向，再以繁體中文模型識別。快速模式約 3–6 秒/頁；精校模式較慢，但對古籍字頭更穩。</p>
+          <p class="setting-desc">掃描頁按導入時選定的版式識別：橫排走橫向行識別，豎排按直行切字後重排。快速模式約 3–8 秒/頁；精校模式較慢，但對古籍字頭更穩。</p>
           <div class="setting-row two">
             <label>頁碼範圍</label>
             <input id="ocrStart" type="number" min="1" value="49">
@@ -254,13 +241,14 @@
             <div class="ocr-progress-head"><span id="ocrProgressText">準備中…</span><b id="ocrProgressPct">0%</b></div>
             <div class="ocr-bar"><i id="ocrBar"></i></div>
           </div>
-          <div class="setting-inline"><span id="ocrState">已完成 4 頁樣張</span><div class="inline-actions"><button class="ghost" id="viewOcr">查看識別初稿</button><button class="primary small" id="startOcr">開始識別</button></div></div>
+          <div class="setting-inline"><span id="ocrState">尚未開始</span><div class="inline-actions"><button class="ghost" id="viewOcr">查看識別初稿</button><button class="primary small" id="startOcr">開始識別</button></div></div>
+          <p class="setting-desc setting-warn">對已導入的書重跑同一段頁碼，會替換那幾頁的正文；該頁上的批註也會一併移除。建議先備份 data 目錄。</p>
         </section>
 
         <section class="about">
           <h4>關於青簡</h4>
-          <p>本地執行的二十四史閱讀器。PDF、OCR 與批注均不出本機；今譯僅在你配置接口後，將所選段落發送至該接口。</p>
-          <p class="credit">樣章正文參校維基文庫《晉書》卷001（CC BY-SA 4.0）；原掃描件版權歸原出版者，請在合法範圍內使用。</p>
+          <p>本地執行的二十四史閱讀器。PDF、OCR、批註與閱讀進度都在本機；沒有遠端統計，也不連接任何翻譯服務。</p>
+          <p class="credit">樣章正文參校維基文庫《晉書》卷001（CC BY-SA 4.0）；原掃描件版權歸原出版者，請在合法範圍內使用。第三方組件與字體許可見 THIRD_PARTY_NOTICES.md 與 LICENSES 目錄。</p>
         </section>
       </div>
     </div>
@@ -269,21 +257,100 @@
   <div class="modal-backdrop" id="libraryModal" hidden>
     <div class="modal library-modal" role="dialog" aria-modal="true" aria-labelledby="libraryTitle">
       <div class="modal-head">
-        <div><span class="panel-eyebrow">書庫</span><h3 id="libraryTitle">二十四史</h3></div>
-        <button class="round-btn" data-close="libraryModal">×</button>
+        <div><span class="panel-eyebrow">書庫</span><h3 id="libraryTitle">書庫</h3></div>
+        <div class="modal-head-actions">
+          <button class="ghost" id="libraryImportBtn">導入 PDF</button>
+          <button class="round-btn" data-close="libraryModal">×</button>
+        </div>
       </div>
       <div class="library-intro">
-        <span>已導入 <b>1</b> / 24</span>
-        <span>點擊未導入的史書可查看導入方式</span>
+        <span id="librarySummary">已導入 0 部</span>
+        <span>雙擊書卡可切換閱讀</span>
       </div>
+      <div class="library-section-title">我的書庫</div>
+      <div class="library-grid imported-grid" id="importedGrid"></div>
+      <div class="library-section-title">二十四史</div>
       <div class="library-grid" id="libraryGrid"></div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="importModal" hidden>
+    <div class="modal import-modal" role="dialog" aria-modal="true" aria-labelledby="importTitle">
+      <div class="modal-head">
+        <div><span class="panel-eyebrow">導入</span><h3 id="importTitle">把一本 PDF 收進書庫</h3></div>
+        <button class="round-btn" data-close="importModal">×</button>
+      </div>
+      <div class="import-body">
+        <button class="import-drop" id="importDrop">
+          <input type="file" id="importFile" accept="application/pdf,.pdf" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" /></svg>
+          <b id="importDropTitle">選擇或拖入 PDF</b>
+          <span id="importFileName">文件只保存在本機</span>
+        </button>
+
+        <div class="import-detail" id="importDetail" hidden>
+          <div class="import-preview">
+            <img id="importPreview" alt="首頁預覽" hidden>
+            <div class="import-preview-empty" id="importPreviewEmpty">首頁</div>
+          </div>
+          <div class="import-fields">
+            <div class="setting-row"><label>書名</label><input id="importBookTitle" type="text" placeholder="書名"></div>
+            <div class="setting-row"><label>撰者</label><input id="importAuthor" type="text" placeholder="如：唐 · 房玄齡等撰"></div>
+            <div class="setting-row"><label>卷名</label><input id="importChapterTitle" type="text" value="全書"></div>
+            <div class="setting-row">
+              <label>版式</label>
+              <div class="segmented" id="importLayoutSeg">
+                <button data-layout="auto" class="active">自動識別</button>
+                <button data-layout="vertical">豎排</button>
+                <button data-layout="horizontal">橫排</button>
+              </div>
+            </div>
+            <div class="setting-row">
+              <label>掃描方向</label>
+              <select id="importRotation" class="mini-select">
+                <option value="auto">自動</option>
+                <option value="0">0°</option>
+                <option value="90">90°</option>
+                <option value="180">180°</option>
+                <option value="270">270°</option>
+              </select>
+            </div>
+            <div class="import-detect" id="importDetectState">選中 PDF 後，會先試讀一兩頁，判斷豎排或橫排。</div>
+            <div class="setting-row two">
+              <label>頁碼</label>
+              <input id="importStart" type="number" min="1" value="1">
+              <span class="dash">—</span>
+              <input id="importEnd" type="number" min="1" value="1">
+            </div>
+            <div class="setting-row"><label>識別</label>
+              <div class="segmented" id="importQualitySeg">
+                <button data-quality="fast" class="active">快速</button>
+                <button data-quality="high">精校（慢）</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="ocr-progress import-progress" id="importProgress" hidden>
+          <div class="ocr-progress-head"><span id="importProgressText">準備中…</span><b id="importProgressPct">0%</b></div>
+          <div class="ocr-bar"><i id="importProgressBar"></i></div>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <span class="hint" id="importHint">PDF 只保存在本機，不上傳。導入後可逐頁校對。</span>
+        <div>
+          <button class="ghost" data-close="importModal">取消</button>
+          <button class="ghost" id="importAnalyzeBtn" disabled>重新識別版式</button>
+          <button class="primary" id="importCommitBtn" disabled>開始導入</button>
+        </div>
+      </div>
     </div>
   </div>
 
   <div class="modal-backdrop" id="searchModal" hidden>
     <div class="modal search-modal" role="dialog" aria-modal="true" aria-labelledby="searchTitle">
       <div class="modal-head">
-        <div><span class="panel-eyebrow">檢索</span><h3 id="searchTitle">在《晉書》中查找</h3></div>
+        <div><span class="panel-eyebrow">檢索</span><h3 id="searchTitle">在書中查找</h3></div>
         <button class="round-btn" data-close="searchModal">×</button>
       </div>
       <div class="search-bar">
@@ -297,7 +364,7 @@
   <div class="modal-backdrop" id="annotationModal" hidden>
     <div class="modal annotation-modal" role="dialog" aria-modal="true" aria-labelledby="annotationTitle">
       <div class="modal-head">
-        <div><span class="panel-eyebrow">批注</span><h3 id="annotationTitle">我的批注</h3></div>
+        <div><span class="panel-eyebrow">批註</span><h3 id="annotationTitle">我的批註</h3></div>
         <button class="round-btn" data-close="annotationModal">×</button>
       </div>
       <div class="quote-box" id="annotationQuote"></div>

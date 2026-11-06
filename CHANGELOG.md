@@ -4,6 +4,66 @@ All notable changes to this project will be documented in this file.
 
 本文件记录青简 / ReadHistory 的重要变更。
 
+## [0.2.0] — 2026-11-06
+
+### 中文
+
+**面向普通读者的 Windows 可携版与 PDF 导入版。**
+
+- Windows 发布改为**小体积 EXE + `runtime` 运行目录**：`Qingjian_ReadHistory.exe` 约 40 KB，Python 3.12、PDFium、RapidOCR、繁体中文模型与 Noto / 霞鹜文楷字体放在旁边；压缩包约 235 MB，不需要安装 Python，也不再在首次启动解包 300 多 MB 到用户目录。
+- 自带窗口：阅读界面在程序自己的 WebView2 窗口中打开，不再依赖外部 Microsoft Edge 标签页；默认最大化并做高 DPI 适配。WebView2 初始化失败时窗口内提供「重試 / 在瀏覽器中打開」，托盘菜单也保留浏览器入口。
+- 启动日志改为写在程序目录的 `logs/launcher.log`、`logs/server.log`，不会自动删除；启动失败弹窗可复制异常与 `server.log` 末尾，另附 `診斷.bat` 直接显示控制台错误。
+- 删除运行组件中未使用的 86 MB `ch_PP-OCRv4_rec_server` 模型与 29 MB OpenCV ffmpeg DLL，并保留精校 OCR 所需的 `ch_doc_server` 模型；未压缩运行目录从约 537 MB 降到约 422 MB，压缩包约 235 MB。
+- 保留旧式单文件构建脚本作为兼容选项，但默认下载改为可携 ZIP。
+- 新增「导入 PDF」向导：选择文件、读取首頁预览、填写书名/撰者/卷名、选择页码范围、后台 OCR 入库。
+- 新增版式自动识别：在 0°/90°/180°/270° 与横排/竖排两条管线之间试读比较，自动判断扫描方向与竖排/横排；识别不准时可手动指定版式。
+- 新增竖排古籍 OCR：按直行切分、字格拟合、单字裁切后横向重排识别，保留右起阅读顺序；横排书继续整行识别。
+- 新增 OCR 进度与增量阅读：导入后后台逐页识别，已识别的段落自动出现在阅读器中；重跑同一页范围会替换该范围正文。
+- 移除现代汉语今译：删除今译面板、选段翻译、OpenAI 兼容客户端、API Key 设置、`reader/translate.py` 与样章译文数据；应用不再连接任何模型接口。
+- 新增字体切换：宋体（Noto Serif SC）、黑体（Noto Sans SC）、楷体（霞鹜文楷 LXGW WenKai，随包 OFL 字体）；西文优先 Times New Roman，缺失时回退到 Tinos / Liberation Serif。
+- 界面改为更古朴的纸纹、朱砂、双线边框风格；重做设置、书库、导入、批注与 OCR 校对台。
+- 新增 `reader/paths.py`，区分只读程序目录与可写数据目录；新增数据库迁移，兼容 0.1.0 的 `reader.db`。
+- 新增 C# 启动器（可携版小 EXE 与旧式单文件版共用）、打包脚本、图标与 SHA256 输出。
+- 新增 `docs/LICENSING.md`：说明内置 Python/OCR/字体的再分发边界；更新 `THIRD_PARTY_NOTICES.md` 与 `LICENSES/`。
+- 修正《晋书》样章扫描页方向迁移问题：数据库中的旧 `orientation=0` 不再阻止自动纠偏。
+- 版本号提升至 `0.2.0`。
+
+**已知限制**
+
+- 竖排 OCR 对双行小注、朱批、行草、严重残缺的刻本仍不稳定，识别结果需对照原影校对。
+- 自动版式判断依赖正文页；封面、牌记、空白页可能误判，可换起始页或手动选版式。
+- 启动器 EXE 未签名，首次运行可能出现 SmartScreen 提示。
+- 导入大 PDF 的整本 OCR 可能耗时数小时；建议先选 10–20 页试读。
+
+### English
+
+**A portable Windows build and PDF-import release for general readers.**
+
+- Windows release now uses a **small launcher EXE plus a `runtime` folder**: `Qingjian_ReadHistory.exe` is about 40 KB, while Python 3.12, PDFium, RapidOCR, the traditional-Chinese model, and Noto / LXGW WenKai fonts live beside it. The ZIP is about 235 MB; no Python installation and no 300 MB first-run unpacking.
+- The reader now opens in the app's own embedded WebView2 window instead of an external Edge tab, maximized and DPI-aware. If WebView2 fails to initialize, the window offers retry/browser buttons and the tray keeps a browser entry.
+- Startup logs now live under the program folder (`logs/launcher.log`, `logs/server.log`) and are never auto-deleted. A failure dialog shows copyable exception details plus the tail of `server.log`, and `診斷.bat` shows console errors directly.
+- Removed the unused 86 MB `ch_PP-OCRv4_rec_server` model and 29 MB OpenCV ffmpeg DLL; the high-quality OCR path using `ch_doc_server` still works. Uncompressed runtime dropped from about 537 MB to 422 MB.
+- The legacy single-file build script remains available as a compatibility option, but the default download is the portable ZIP.
+- Added a PDF import wizard: pick a file, preview the first page, set title/author/chapter/page range, and OCR it into the library in the background.
+- Added automatic layout detection: candidate rotations (0°/90°/180°/270°) are tried with both horizontal and vertical pipelines, and the best-scoring reading is chosen; users can override the layout manually.
+- Added vertical-typesetting OCR: columns are detected from ink projections, character cells are fitted and cropped, then laid out horizontally for recognition while preserving right-to-left reading order.
+- Added OCR progress and incremental reading: recognised paragraphs appear while the job runs; re-running a page range replaces that range.
+- Removed modern-Chinese translation entirely: UI panel, selection translation, OpenAI-compatible client, API-key settings, `reader/translate.py`, and sample translations. The app no longer contacts any model endpoint.
+- Added font switching: Song (Noto Serif SC), Hei (Noto Sans SC), Kai (bundled LXGW WenKai, OFL 1.1); Latin text prefers Times New Roman with Tinos / Liberation Serif fallbacks.
+- Refreshed the UI with paper grain, cinnabar seals, and double-rule borders; rebuilt settings, library, import, annotation, and OCR proofreading screens.
+- Added `reader/paths.py` to separate the read-only app directory from writable data, plus a database migration compatible with 0.1.0.
+- Added the C# launcher, build script, icon, and SHA256 output.
+- Added `docs/LICENSING.md` analysing redistribution of the embedded runtime and fonts; refreshed `THIRD_PARTY_NOTICES.md` and `LICENSES/`.
+- Fixed the sample-book rotation migration so an old `orientation=0` no longer disables auto-correction.
+- Bumped the version to `0.2.0`.
+
+**Known limitations**
+
+- Vertical OCR remains unreliable for double-column notes, handwritten marks, cursive, and badly damaged prints; proofread against the scan.
+- Automatic layout detection depends on body-text pages; covers, title pages, and blanks may be misclassified. Change the start page or choose the layout manually.
+- The launcher executable is unsigned, so SmartScreen may warn on first run.
+- OCR-ing a whole large PDF can take hours; start with 10–20 pages.
+
 ## [0.1.0] — 2026-11-06
 
 ### 中文

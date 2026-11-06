@@ -4,13 +4,13 @@ import json
 import sqlite3
 import uuid
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
 
-ROOT = Path(__file__).resolve().parent.parent
-DATA = ROOT / "data"
-DB_PATH = DATA / "reader.db"
-SEED_PATH = DATA / "seed" / "jinshu_vol1.json"
+from . import paths
+
+DATA = paths.DATA
+DB_PATH = paths.DB_PATH
+SEED_PATH = paths.SEED / "jinshu_vol1.json"
 
 
 def now() -> str:
@@ -37,7 +37,12 @@ CREATE TABLE IF NOT EXISTS books (
     total_pages INTEGER DEFAULT 0,
     source_pdf TEXT,
     cover TEXT,
-    accent TEXT
+    accent TEXT,
+    layout TEXT DEFAULT 'horizontal',
+    orientation INTEGER,
+    imported INTEGER DEFAULT 0,
+    status TEXT DEFAULT 'ready',
+    created_at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS chapters (
@@ -57,7 +62,6 @@ CREATE TABLE IF NOT EXISTS paragraphs (
     chapter_id TEXT NOT NULL REFERENCES chapters(id) ON DELETE CASCADE,
     order_no INTEGER NOT NULL,
     text TEXT NOT NULL,
-    translation TEXT,
     page_start INTEGER,
     page_end INTEGER,
     ocr_confidence REAL,
@@ -118,9 +122,40 @@ CREATE INDEX IF NOT EXISTS idx_annotations_paragraph ON annotations(paragraph_id
 """
 
 
+def _migrate(con: sqlite3.Connection) -> None:
+    """Add columns introduced after 0.1.0 without touching existing data."""
+    wanted = {
+        "books": [
+            ("layout", "TEXT DEFAULT 'horizontal'"),
+            ("orientation", "INTEGER"),
+            ("imported", "INTEGER DEFAULT 0"),
+            ("status", "TEXT DEFAULT 'ready'"),
+            ("created_at", "TEXT"),
+        ],
+        "chapters": [("page_count", "INTEGER DEFAULT 0")],
+    }
+    for table, columns in wanted.items():
+        have = {row["name"] for row in con.execute(f"PRAGMA table_info({table})")}
+        for name, decl in columns:
+            if name not in have:
+                con.execute(f"ALTER TABLE {table} ADD COLUMN {name} {decl}")
+    # The 0.1.0 sample PDF is stored rotated; let the OCR layer detect the
+    # angle per page instead of inheriting a migration default of 0.
+    con.execute(
+        "UPDATE books SET orientation=NULL WHERE id='jinshu' AND imported=0 AND orientation=0"
+    )
+    # OCR jobs live in memory. If the process was closed mid-import, make the
+    # already-recognised pages readable instead of leaving a permanent
+    # "importing" badge.
+    con.execute("UPDATE chapters SET status='ready' WHERE status='importing'")
+    con.execute("UPDATE books SET status='ready' WHERE status='importing'")
+
+
 def init_db() -> None:
+    paths.ensure_dirs()
     with connect() as con:
         con.executescript(SCHEMA)
+        _migrate(con)
         if con.execute("SELECT COUNT(*) FROM books").fetchone()[0] == 0:
             seed(con)
 
@@ -129,8 +164,10 @@ def seed(con: sqlite3.Connection) -> None:
     data = json.loads(SEED_PATH.read_text(encoding="utf-8"))
     book = data["book"]
     con.execute(
-        """INSERT INTO books (id,title,author,dynasty,edition,description,total_pages,source_pdf,cover,accent)
-           VALUES (?,?,?,?,?,?,?,?,?,?)""",
+        """INSERT INTO books
+           (id,title,author,dynasty,edition,description,total_pages,source_pdf,cover,accent,
+            layout,orientation,imported,status,created_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
         (
             book["id"],
             book["title"],
@@ -142,6 +179,11 @@ def seed(con: sqlite3.Connection) -> None:
             book.get("source_pdf"),
             book.get("cover"),
             book.get("accent"),
+            book.get("layout", "horizontal"),
+            book.get("orientation"),
+            0,
+            "ready",
+            now(),
         ),
     )
     for ch in data["chapters"]:
@@ -162,13 +204,12 @@ def seed(con: sqlite3.Connection) -> None:
         )
         for para in ch.get("paragraphs", []):
             cur = con.execute(
-                """INSERT INTO paragraphs (chapter_id,order_no,text,translation,page_start,page_end,reviewed)
-                   VALUES (?,?,?,?,?,?,1)""",
+                """INSERT INTO paragraphs (chapter_id,order_no,text,page_start,page_end,reviewed)
+                   VALUES (?,?,?,?,?,1)""",
                 (
                     ch["id"],
                     para["order_no"],
                     para["text"],
-                    para.get("translation"),
                     para.get("page_start"),
                     para.get("page_end"),
                 ),
@@ -246,7 +287,7 @@ def seed(con: sqlite3.Connection) -> None:
                     "layout": "vertical",
                     "theme": "paper",
                     "fontSize": 21,
-                    "showTranslation": True,
+                    "fontFamily": "song",
                 },
                 ensure_ascii=False,
             ),
@@ -281,6 +322,127 @@ def get_book(book_id: str) -> dict[str, Any] | None:
     with connect() as con:
         row = con.execute("SELECT * FROM books WHERE id=?", (book_id,)).fetchone()
         return dict(row) if row else None
+
+
+def create_book(book: dict[str, Any]) -> dict[str, Any]:
+    with connect() as con:
+        con.execute(
+            """INSERT INTO books
+               (id,title,author,dynasty,edition,description,total_pages,source_pdf,cover,accent,
+                layout,orientation,imported,status,created_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (
+                book["id"],
+                book["title"],
+                book.get("author") or "",
+                book.get("dynasty") or "",
+                book.get("edition") or "導入掃描本",
+                book.get("description") or "",
+                int(book.get("total_pages") or 0),
+                book.get("source_pdf"),
+                book.get("cover"),
+                book.get("accent") or "#a33b2b",
+                book.get("layout") or "horizontal",
+                int(book.get("orientation") or 0),
+                1 if book.get("imported") else 0,
+                book.get("status") or "importing",
+                now(),
+            ),
+        )
+        con.commit()
+        row = con.execute("SELECT * FROM books WHERE id=?", (book["id"],)).fetchone()
+        return dict(row)
+
+
+def update_book(book_id: str, **fields: Any) -> None:
+    allowed = {
+        "title", "author", "dynasty", "edition", "description", "total_pages",
+        "source_pdf", "cover", "accent", "layout", "orientation", "status",
+    }
+    pairs = [(k, v) for k, v in fields.items() if k in allowed]
+    if not pairs:
+        return
+    with connect() as con:
+        con.execute(
+            "UPDATE books SET " + ",".join(f"{k}=?" for k, _ in pairs) + " WHERE id=?",
+            [v for _, v in pairs] + [book_id],
+        )
+        con.commit()
+
+
+def create_chapter(chapter: dict[str, Any]) -> dict[str, Any]:
+    with connect() as con:
+        con.execute(
+            """INSERT INTO chapters
+               (id,book_id,volume,title,subtitle,order_no,page_start,page_end,status,page_count)
+               VALUES (?,?,?,?,?,?,?,?,?,?)""",
+            (
+                chapter["id"],
+                chapter["book_id"],
+                chapter.get("volume") or "卷一",
+                chapter["title"],
+                chapter.get("subtitle") or "",
+                int(chapter.get("order_no") or 1),
+                chapter.get("page_start"),
+                chapter.get("page_end"),
+                chapter.get("status") or "importing",
+                int(chapter.get("page_count") or 0),
+            ),
+        )
+        con.commit()
+        row = con.execute("SELECT * FROM chapters WHERE id=?", (chapter["id"],)).fetchone()
+        return dict(row)
+
+
+def update_chapter(chapter_id: str, **fields: Any) -> None:
+    allowed = {"title", "subtitle", "status", "page_start", "page_end", "page_count"}
+    pairs = [(k, v) for k, v in fields.items() if k in allowed]
+    if not pairs:
+        return
+    with connect() as con:
+        con.execute(
+            "UPDATE chapters SET " + ",".join(f"{k}=?" for k, _ in pairs) + " WHERE id=?",
+            [v for _, v in pairs] + [chapter_id],
+        )
+        con.commit()
+
+
+def add_paragraph(
+    chapter_id: str,
+    order_no: int,
+    text: str,
+    page_start: int | None = None,
+    page_end: int | None = None,
+    confidence: float | None = None,
+) -> int:
+    with connect() as con:
+        cur = con.execute(
+            """INSERT INTO paragraphs
+               (chapter_id,order_no,text,page_start,page_end,ocr_confidence,reviewed)
+               VALUES (?,?,?,?,?,?,0)""",
+            (chapter_id, order_no, text, page_start, page_end, confidence),
+        )
+        con.commit()
+        return int(cur.lastrowid)
+
+
+def delete_paragraphs_for_pages(chapter_id: str, start: int, end: int) -> None:
+    with connect() as con:
+        con.execute(
+            """DELETE FROM paragraphs
+               WHERE chapter_id=? AND page_start>=? AND page_end<=?""",
+            (chapter_id, start, end),
+        )
+        con.commit()
+
+
+def next_paragraph_order(chapter_id: str) -> int:
+    with connect() as con:
+        row = con.execute(
+            "SELECT COALESCE(MAX(order_no),0)+1 FROM paragraphs WHERE chapter_id=?",
+            (chapter_id,),
+        ).fetchone()
+        return int(row[0])
 
 
 def get_chapters(book_id: str) -> list[dict[str, Any]]:
@@ -341,15 +503,6 @@ def get_paragraph(paragraph_id: int) -> dict[str, Any] | None:
             (paragraph_id,),
         ).fetchone()
         return dict(row) if row else None
-
-
-def update_translation(paragraph_id: int, translation: str, model: str | None = None) -> None:
-    with connect() as con:
-        con.execute(
-            "UPDATE paragraphs SET translation=?, reviewed=1 WHERE id=?",
-            (translation, paragraph_id),
-        )
-        con.commit()
 
 
 def get_annotations(book_id: str, chapter_id: str | None = None) -> list[dict[str, Any]]:
