@@ -1,0 +1,10 @@
+pypdfium2>=4.30
+rapidocr==2.1.0
+opencv-python>=4.8
+onnxruntime>=1.16
+numpy>=1.26,<3
+PyYAML>=6
+omegaconf>=2.3
+requests>=2.31
+colorlog>=6
+Pillow>=10

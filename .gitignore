@@ -1,0 +1,28 @@
+# 本地数据
+data/reader.db
+data/reader.db-shm
+data/reader.db-wal
+data/pages/
+data/ocr/
+data/inbox/*.pdf
+
+# 依赖与构建产物
+.deps*/
+.ocr*/
+.ocrdeps/
+.pdfium/
+.testdeps/
+.venv/
+vendor/
+.edge*/
+.tmp/
+tmp/
+samples/
+dist/
+__pycache__/
+*.pyc
+test-*.jpg
+
+# 原始 PDF 与个人文件
+*.pdf
+!docs/*.pdf
